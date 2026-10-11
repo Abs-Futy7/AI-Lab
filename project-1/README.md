@@ -1,5 +1,7 @@
 # Emergency Vehicle Routing with AI Search
 
+[**Live application**](https://ai-lab-project-1.vercel.app) · [**Six-algorithm live simulation**](https://ai-lab-project-1.vercel.app/simulation)
+
 An interactive AI laboratory project that compares six manually implemented search algorithms on a real directed OpenStreetMap road network in central Dhaka.
 
 The backend models emergency routing as a graph-search problem, applies reproducible traffic and hazard scenarios, executes the selected search algorithm, and returns both the final route and the exact node-expansion order. The frontend replays that trace on Leaflet maps, reports route and search metrics, compares every algorithm under the same conditions, and provides a synchronized six-map simulation.
