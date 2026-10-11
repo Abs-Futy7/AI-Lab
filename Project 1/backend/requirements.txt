@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+osmnx
+networkx
+pydantic
+python-dotenv
+pytest
+httpx
