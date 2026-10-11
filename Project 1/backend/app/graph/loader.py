@@ -56,8 +56,13 @@ def _download_or_load_graph() -> tuple[nx.MultiDiGraph, str]:
             network_type="drive",
             simplify=True,
         )
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        ox.save_graphml(graph, cache)
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            ox.save_graphml(graph, cache)
+        except OSError as exc:
+            # Serverless deployment bundles are read-only. The downloaded graph
+            # remains usable for this process even when it cannot be cached.
+            logger.warning("Could not persist GraphML cache: %s", exc)
         return graph, "openstreetmap"
     except Exception as exc:  # graceful startup when Overpass/network is unavailable
         logger.warning("OSM graph download failed; using fallback graph: %s", exc)

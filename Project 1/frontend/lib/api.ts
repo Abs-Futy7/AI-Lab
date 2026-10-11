@@ -25,7 +25,7 @@ export function readableApiError(error: unknown): string {
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
     if (error.code === "ECONNABORTED") return "The routing request timed out.";
-    if (!error.response) return "Cannot reach the backend at port 8000.";
+    if (!error.response) return "Cannot reach the routing backend.";
   }
   return "The routing request could not be completed.";
 }

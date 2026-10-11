@@ -20,6 +20,16 @@ class Settings:
     graph_cache_path: Path = Path(
         os.getenv("GRAPH_CACHE_PATH", str(BACKEND_DIR / "data" / "dhaka_drive.graphml"))
     )
+    cors_origins: tuple[str, ...] = tuple(
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+        ).split(",")
+        if origin.strip()
+    )
+    cors_origin_regex: str | None = os.getenv(
+        "CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app"
+    ) or None
 
 
 settings = Settings()

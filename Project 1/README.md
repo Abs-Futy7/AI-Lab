@@ -1005,6 +1005,50 @@ npm run build
 
 This runs the optimized Next.js build and TypeScript checking.
 
+## Deploying on Vercel
+
+Deploy the repository as two Vercel projects because the Next.js frontend and
+FastAPI backend have separate runtimes. Vercel supports multiple projects from
+one Git repository.
+
+### 1. Deploy the API
+
+Import `Abs-Futy7/AI-Lab` and use these settings:
+
+| Setting | Value |
+|---|---|
+| Project name | `ai-lab-project-1-api` |
+| Root Directory | `Project 1/backend` |
+| Framework Preset | FastAPI (automatic detection) |
+| Build/Output settings | Leave at their detected defaults |
+
+After deployment, verify `https://YOUR-API.vercel.app/api/health` returns
+`{"status":"ok"}`. The checked-in Dhaka GraphML file avoids downloading the
+road network during a serverless cold start.
+
+### 2. Deploy the frontend
+
+Import the same repository again as a separate project:
+
+| Setting | Value |
+|---|---|
+| Project name | `ai-lab-project-1` |
+| Root Directory | `Project 1/frontend` |
+| Framework Preset | Next.js |
+| Build command | `npm run build` (detected automatically) |
+| Output directory | Next.js default |
+
+Add this environment variable for Production, Preview, and Development:
+
+```dotenv
+NEXT_PUBLIC_API_URL=https://YOUR-API.vercel.app
+```
+
+Replace `YOUR-API` with the API project domain, deploy the frontend, and open
+its `/simulation` page. The backend permits localhost plus HTTPS Vercel preview
+and production domains by default. For a custom frontend domain, add its full
+origin to the backend project's `CORS_ORIGINS` variable and redeploy the API.
+
 ## Representative findings
 
 The sample measurements below come from the normal scenario with the default weights and the source/destination used during development. Runtime depends on hardware and should be treated as illustrative, while deterministic route/expansion behavior should repeat when graph data and inputs are unchanged.

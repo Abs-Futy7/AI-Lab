@@ -4,6 +4,7 @@ backend/.env
 backend/**/__pycache__/
 backend/.pytest_cache/
 backend/data/*.graphml
+!backend/data/dhaka_drive.graphml
 backend/cache/
 
 # Next.js / Node
