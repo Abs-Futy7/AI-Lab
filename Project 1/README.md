@@ -1007,47 +1007,34 @@ This runs the optimized Next.js build and TypeScript checking.
 
 ## Deploying on Vercel
 
-Deploy the repository as two Vercel projects because the Next.js frontend and
-FastAPI backend have separate runtimes. Vercel supports multiple projects from
-one Git repository.
+The repository-level `vercel.json` deploys Project 1 as one Vercel project with
+two independently built services:
 
-### 1. Deploy the API
+| Service | Source directory | Framework | Public route |
+|---|---|---|---|
+| `backend` | `Project 1/backend` | FastAPI | `/api/*` |
+| `frontend` | `Project 1/frontend` | Next.js | all other paths |
 
-Import `Abs-Futy7/AI-Lab` and use these settings:
+Import `Abs-Futy7/AI-Lab` in Vercel and keep the repository root as the Root
+Directory. Vercel reads `vercel.json`, builds both services, and publishes them
+on one domain. No production `NEXT_PUBLIC_API_URL` is needed: browser requests
+use same-origin `/api/*` URLs and the top-level rewrite sends them to FastAPI.
 
-| Setting | Value |
-|---|---|
-| Project name | `ai-lab-project-1-api` |
-| Root Directory | `Project 1/backend` |
-| Framework Preset | FastAPI (automatic detection) |
-| Build/Output settings | Leave at their detected defaults |
+The backend remains intentionally public under `/api/*`; no service binding is
+declared because the frontend calls it from client-side React code rather than
+from a server-side function. The checked-in Dhaka GraphML file avoids an
+OpenStreetMap download during a serverless cold start.
 
-After deployment, verify `https://YOUR-API.vercel.app/api/health` returns
-`{"status":"ok"}`. The checked-in Dhaka GraphML file avoids downloading the
-road network during a serverless cold start.
+For local development with the existing separate dev servers, copy
+`frontend/.env.local.example` to `frontend/.env.local`. To run both services
+through Vercel's local router instead, use:
 
-### 2. Deploy the frontend
-
-Import the same repository again as a separate project:
-
-| Setting | Value |
-|---|---|
-| Project name | `ai-lab-project-1` |
-| Root Directory | `Project 1/frontend` |
-| Framework Preset | Next.js |
-| Build command | `npm run build` (detected automatically) |
-| Output directory | Next.js default |
-
-Add this environment variable for Production, Preview, and Development:
-
-```dotenv
-NEXT_PUBLIC_API_URL=https://YOUR-API.vercel.app
+```powershell
+npx vercel dev -L
 ```
 
-Replace `YOUR-API` with the API project domain, deploy the frontend, and open
-its `/simulation` page. The backend permits localhost plus HTTPS Vercel preview
-and production domains by default. For a custom frontend domain, add its full
-origin to the backend project's `CORS_ORIGINS` variable and redeploy the API.
+After deployment, verify `/api/health` returns `{"status":"ok"}` and open
+`/simulation` to test the synchronized six-algorithm view.
 
 ## Representative findings
 
