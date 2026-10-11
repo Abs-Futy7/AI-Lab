@@ -1012,8 +1012,8 @@ two independently built services:
 
 | Service | Source directory | Framework | Public route |
 |---|---|---|---|
-| `backend` | `Project 1/backend` | FastAPI | `/api/*` |
-| `frontend` | `Project 1/frontend` | Next.js | all other paths |
+| `backend` | `project-1/backend` | FastAPI | `/api/*` |
+| `frontend` | `project-1/frontend` | Next.js | all other paths |
 
 Import `Abs-Futy7/AI-Lab` in Vercel and keep the repository root as the Root
 Directory. Vercel reads `vercel.json`, builds both services, and publishes them

@@ -2,5 +2,5 @@
 
 ## Projects
 
-- [Project 1 — AI Search Algorithm Visualizer](./Project%201/README.md)
+- [Project 1 — AI Search Algorithm Visualizer](./project-1/README.md)
 
