@@ -1294,9 +1294,12 @@ The dedicated `/lab2` page contains:
 - incident and center markers on Leaflet;
 - recognizable ambulance/medical, fire, accident, flood, and rescue signs instead of plain color-only markers;
 - animated real road-route allocations with play, pause, and replay;
+- previous/next step inspection showing fleet resource, station, route, incident, response time, distance, and deadline validation;
+- fleet readiness cards for every fixed dispatch station, synchronized with the active allocation step;
 - total incidents, CSP variables, resources, allocations, and violations;
 - solver-specific metrics and measured runtime;
 - a same-scenario comparison view;
+- expanded-node, runtime, weighted-cost, and route-distance graphs in the six-algorithm Lab-1 comparison window;
 - the real domain-pruning inspector and LCV order;
 - Backjump trace or Min-Conflicts history;
 - allocated and unallocated requirement details;

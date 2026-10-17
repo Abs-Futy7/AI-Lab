@@ -24,6 +24,10 @@ const initialConfig: Lab2GenerateRequest = {
   resource_availability: "normal", seed: 42,
 };
 
+const fleetSymbols: Record<string, string> = {
+  AMBULANCE: "🚑", FIRE_UNIT: "🚒", RESCUE_TEAM: "🛟",
+};
+
 function number(value: number) { return new Intl.NumberFormat().format(value); }
 function label(value: string) { return value.replaceAll("_", " "); }
 
@@ -53,6 +57,8 @@ export default function Lab2Dashboard() {
     [result, selectedVariable],
   );
   const visibleAllocations = result?.allocations.slice(0, playStep) ?? [];
+  const currentAllocation = playStep > 0 ? result?.allocations[playStep - 1] : undefined;
+  const currentCenter = scenario?.centers.find((center) => center.id === currentAllocation?.center_id);
 
   async function generate() {
     setLoading("generate"); setError(null);
@@ -127,12 +133,25 @@ export default function Lab2Dashboard() {
             <div><span>Violations</span><strong>{result?.constraint_violations ?? "—"}</strong></div>
           </div>
           <div className="lab2-map-head"><div><span className="eyebrow">Shared Lab‑1 road graph</span><h2>Live dispatch allocation</h2></div>{scenario && <span className="lab2-scenario-id">{scenario.scenario_id}</span>}</div>
-          <EmergencyMap centers={scenario?.centers ?? []} incidents={scenario?.incidents ?? []} allocations={visibleAllocations} />
+          <EmergencyMap centers={scenario?.centers ?? []} incidents={scenario?.incidents ?? []} allocations={visibleAllocations} activeCenterId={currentAllocation?.center_id} activeIncidentId={currentAllocation?.incident_id} />
           <div className="lab2-playback">
             <button disabled={!result} onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"}</button>
             <button disabled={!result} onClick={() => { setPlayStep(0); setPlaying(true); }}>Replay</button>
+            <button disabled={!result || playStep <= 0} onClick={() => { setPlaying(false); setPlayStep((step) => Math.max(0, step - 1)); }}>Previous</button>
+            <button disabled={!result || playStep >= (result?.allocations.length ?? 0)} onClick={() => { setPlaying(false); setPlayStep((step) => Math.min(result?.allocations.length ?? 0, step + 1)); }}>Next step</button>
             <div><i style={{ width: `${result?.allocations.length ? playStep / result.allocations.length * 100 : 0}%` }} /></div>
             <span>{playStep} / {result?.allocations.length ?? 0} routes</span>
+          </div>
+          <div className="allocation-step-visualizer">
+            <div className="step-visualizer-heading"><span className="eyebrow">Allocation step visualizer</span><strong>{currentAllocation ? `Step ${playStep} of ${result?.allocations.length}` : "Ready to replay"}</strong></div>
+            {currentAllocation ? <div className="step-flow">
+              <article><b>{fleetSymbols[currentAllocation.resource_type] ?? "🚨"}</b><span>Fleet resource</span><strong>{currentAllocation.resource_id}</strong><small>{label(currentAllocation.resource_type)}</small></article>
+              <i><span>{currentAllocation.travel_time_minutes} min</span><em>road route</em></i>
+              <article><b>🏢</b><span>Dispatch station</span><strong>{currentCenter?.name ?? currentAllocation.center_id}</strong><small>{currentAllocation.center_id}</small></article>
+              <i><span>{(currentAllocation.distance_m / 1000).toFixed(2)} km</span><em>to incident</em></i>
+              <article><b>🚨</b><span>Emergency incident</span><strong>{currentAllocation.incident_id}</strong><small>{label(currentAllocation.incident_type)} · severity {currentAllocation.severity}</small></article>
+              <article className="step-valid"><b>✓</b><span>Constraint check</span><strong>Valid allocation</strong><small>Deadline {currentAllocation.deadline_minutes} min</small></article>
+            </div> : <p>Select Solve &amp; simulate, then use Previous or Next step to inspect each fleet dispatch and station.</p>}
           </div>
         </section>
 
@@ -154,6 +173,11 @@ export default function Lab2Dashboard() {
           </> : <div className="lab2-empty"><BrainCircuit size={28} /><p>Generate a scenario and run a solver to inspect CSP behavior.</p></div>}
         </aside>
       </section>
+
+      {scenario && <section className="lab2-panel fleet-stations-panel">
+        <div className="fleet-panel-heading"><div><span className="eyebrow">Fleet and stations</span><h2>Resource readiness by dispatch center</h2></div><p>The highlighted station is dispatching the currently selected visualization step.</p></div>
+        <div className="fleet-station-grid">{scenario.centers.map((center) => { const fleet = scenario.resources.filter((resource) => resource.center_id === center.id); const available = fleet.filter((resource) => resource.available).length; return <article key={center.id} className={currentAllocation?.center_id === center.id ? "active" : ""}><b>{fleetSymbols[center.center_type] ?? "🚨"}</b><div><strong>{center.name}</strong><span>{label(center.center_type)}</span></div><output>{available}<small> / {fleet.length} ready</small></output><div className="fleet-readiness"><i style={{ width: `${fleet.length ? available / fleet.length * 100 : 0}%` }} /></div></article>; })}</div>
+      </section>}
 
       {comparison && <section className="lab2-panel lab2-comparison"><div><span className="eyebrow">Same-scenario benchmark</span><h2>Algorithm comparison</h2></div><div className="lab2-comparison-grid">{algorithms.map(({ value, label: name }) => { const item = comparison[value]; const maxRuntime = Math.max(...Object.values(comparison).map((value) => value.metrics.runtime_ms), 1); return <article key={value}><header><strong>{name}</strong><span>{item.solution_found ? "SOLVED" : "PARTIAL"}</span></header><div className="metric-bar"><i style={{ width: `${Math.max(3, item.metrics.runtime_ms / maxRuntime * 100)}%` }} /></div><p>{item.metrics.runtime_ms.toFixed(2)} ms · {item.metrics.nodes_visited} nodes · {item.metrics.conflicts_final} conflicts</p></article>; })}</div></section>}
 

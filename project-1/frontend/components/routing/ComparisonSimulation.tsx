@@ -8,6 +8,7 @@ import { Activity, ArrowLeft, FastForward, LoaderCircle, Pause, Play, RotateCcw,
 import { compareRoutes, readableApiError } from "@/lib/api";
 import type { Algorithm, ComparisonRequest, CompareResponse, SearchResult } from "@/types/routing";
 import BestPathAnalysis, { selectRecommendedAlgorithm } from "./BestPathAnalysis";
+import ComparisonMetricCharts from "./ComparisonMetricCharts";
 
 const AlgorithmMap = dynamic(() => import("./AlgorithmSimulationMap"), {
   ssr: false,
@@ -118,6 +119,7 @@ export default function ComparisonSimulation({ request }: { request: ComparisonR
           </section>
 
           <BestPathAnalysis comparison={comparison} />
+          <ComparisonMetricCharts comparison={comparison} />
 
           <section className="algorithm-map-grid">
             {algorithms.map(({ key, label, color }) => {

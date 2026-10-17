@@ -18,4 +18,4 @@ Full documentation: [project-1/README.md](./project-1/README.md)
 - Lab 1: BFS, DFS, Uniform-Cost Search, Iterative Deepening, Greedy Best-First, and A*.
 - Lab 2: manual AC-3, MRV, Degree, LCV, Backtracking, Conflict-Directed Backjumping, and Min-Conflicts.
 
-Lab 2 reuses Lab 1's Central Dhaka road graph, route accessibility, blocked-road scenarios, travel distance, estimated response time, and route geometry without combining the two visual demonstrations.
+Lab 2 reuses Lab 1's Central Dhaka road graph, route accessibility, blocked-road scenarios, travel distance, estimated response time, and route geometry without combining the two visual demonstrations. The interface includes synchronized allocation steps, fleet/station readiness, compact emergency signs, and graph-based algorithm comparison views.

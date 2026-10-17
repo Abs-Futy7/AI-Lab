@@ -13,11 +13,11 @@ The Next.js frontend contains two separate university AI laboratory demonstratio
 
 ### Lab 1: `/lab1`
 
-Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka road graph. It includes scenario controls, weighted costs, expanded nodes, graph coverage, route analysis, and a separate synchronized comparison window.
+Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka road graph. It includes scenario controls, weighted costs, expanded nodes, graph coverage, route analysis, and a synchronized comparison window with expanded-node, runtime, weighted-cost, and route-distance graphs.
 
 ### Lab 2: `/lab2`
 
-Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; fixed emergency centers; symbol-based ambulance, medical, fire, accident, and rescue markers; actual road-route allocations; solver traces; and same-scenario comparison charts.
+Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; compact symbol-based emergency markers; closer map framing; actual road-route allocations; fleet/station readiness; a previous/next allocation-step visualizer; solver traces; and same-scenario comparison charts.
 
 ## Local development
 
