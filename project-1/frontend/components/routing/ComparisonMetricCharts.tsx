@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 
 import type { Algorithm, CompareResponse } from "@/types/routing";
@@ -41,7 +41,6 @@ export default function ComparisonMetricCharts({ comparison }: { comparison: Com
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 10, fontWeight: 800 }} />
                   <YAxis axisLine={false} tickLine={false} width={48} tick={{ fill: "#64748b", fontSize: 9 }} />
                   <Tooltip cursor={{ fill: "#eff6ff" }} contentStyle={{ borderRadius: 8, border: "1px solid #dbe4ee", fontSize: 11 }} />
-                  <Legend content={() => null} />
                   <Bar dataKey={chart.key} fill={chart.color} radius={[5, 5, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
