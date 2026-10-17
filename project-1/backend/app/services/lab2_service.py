@@ -72,7 +72,7 @@ def list_resources(scenario_id: str | None = None) -> dict[str, Any]:
 
 
 def solve(request: SolveRequest) -> dict[str, Any]:
-    scenario = _scenario(request.scenario_id)
+    scenario = _scenario(request.scenario_id, request.scenario)
     problem = _base_problem(scenario).clone()
     consistent = enforce_arc_consistency(problem)
     if not consistent:
@@ -91,7 +91,7 @@ def solve(request: SolveRequest) -> dict[str, Any]:
 
 
 def compare(request: CompareLab2Request) -> dict[str, Any]:
-    scenario = _scenario(request.scenario_id)
+    scenario = _scenario(request.scenario_id, request.scenario)
     base = _base_problem(scenario)
     results: dict[str, Any] = {}
     for algorithm in CSPAlgorithm:
@@ -117,7 +117,22 @@ def compare(request: CompareLab2Request) -> dict[str, Any]:
     }
 
 
-def _scenario(scenario_id: str) -> Lab2Scenario:
+def _scenario(
+    scenario_id: str, supplied: Lab2Scenario | None = None
+) -> Lab2Scenario:
+    if supplied is not None:
+        if supplied.id != scenario_id:
+            raise HTTPException(
+                status_code=400,
+                detail="The supplied frozen scenario does not match scenario_id.",
+            )
+        # Client-carried frozen state makes the workflow reliable across
+        # independent serverless instances without regenerating incidents.
+        with _LOCK:
+            _SCENARIOS[scenario_id] = supplied
+            _SCENARIOS.move_to_end(scenario_id)
+            _PROBLEMS.pop(scenario_id, None)
+        return supplied
     with _LOCK:
         scenario = _SCENARIOS.get(scenario_id)
     if scenario is None:

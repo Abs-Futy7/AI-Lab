@@ -109,6 +109,7 @@ class Lab2Scenario(BaseModel):
 
 class SolveRequest(BaseModel):
     scenario_id: str
+    scenario: Lab2Scenario | None = None
     algorithm: CSPAlgorithm = CSPAlgorithm.backtracking
     debug: bool = True
     local_search_max_steps: int = Field(default=3000, ge=10, le=20000)
@@ -116,5 +117,6 @@ class SolveRequest(BaseModel):
 
 class CompareLab2Request(BaseModel):
     scenario_id: str
+    scenario: Lab2Scenario | None = None
     debug: bool = True
     local_search_max_steps: int = Field(default=3000, ge=10, le=20000)

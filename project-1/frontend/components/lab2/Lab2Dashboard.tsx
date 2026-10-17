@@ -69,7 +69,7 @@ export default function Lab2Dashboard() {
     if (!scenario) return;
     setLoading("solve"); setError(null);
     try {
-      const data = await solveLab2Scenario(scenario.scenario_id, algorithm);
+      const data = await solveLab2Scenario(scenario, algorithm);
       setResult(data); setSelectedVariable(data.domain_inspection[0]?.variable ?? "");
       setPlayStep(0); setPlaying(true);
     } catch (requestError) { setError(readableApiError(requestError)); }
@@ -80,7 +80,7 @@ export default function Lab2Dashboard() {
     if (!scenario) return;
     setLoading("compare"); setError(null);
     try {
-      const data = await compareLab2Scenario(scenario.scenario_id);
+      const data = await compareLab2Scenario(scenario);
       setComparison(data.results);
       const selected = data.results[algorithm];
       setResult(selected); setSelectedVariable(selected.domain_inspection[0]?.variable ?? "");

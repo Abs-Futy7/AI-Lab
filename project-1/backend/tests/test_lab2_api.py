@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from main import app
+from app.services import lab2_service
 
 
 client = TestClient(app)
@@ -58,3 +59,19 @@ def test_compare_reuses_one_frozen_scenario_for_every_solver():
     assert set(payload["results"]) == {"backtracking", "backjumping", "local_search"}
     assert {item["scenario_id"] for item in payload["results"].values()} == {scenario["scenario_id"]}
     assert {item["requirements_total"] for item in payload["results"].values()} == {scenario["summary"]["requirements"]}
+
+
+def test_client_carried_scenario_survives_serverless_cold_instance():
+    scenario = client.post("/api/lab2/scenario/generate", json={
+        "scale": "custom", "request_count": 2, "seed": 2026,
+        "deadline_policy": "relaxed", "resource_availability": "high",
+    }).json()
+    lab2_service._SCENARIOS.clear()
+    lab2_service._PROBLEMS.clear()
+    frozen = {**scenario, "id": scenario["scenario_id"]}
+    response = client.post("/api/lab2/solve", json={
+        "scenario_id": scenario["scenario_id"], "scenario": frozen,
+        "algorithm": "backtracking",
+    })
+    assert response.status_code == 200
+    assert response.json()["scenario_id"] == scenario["scenario_id"]

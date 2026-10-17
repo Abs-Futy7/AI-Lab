@@ -26,18 +26,22 @@ export async function generateLab2Scenario(request: Lab2GenerateRequest): Promis
 }
 
 export async function solveLab2Scenario(
-  scenarioId: string,
+  scenario: Lab2Scenario,
   algorithm: CSPAlgorithm,
 ): Promise<Lab2Result> {
   const { data } = await client.post<Lab2Result>("/api/lab2/solve", {
-    scenario_id: scenarioId, algorithm, debug: true, local_search_max_steps: 3000,
+    scenario_id: scenario.scenario_id,
+    scenario: { ...scenario, id: scenario.scenario_id },
+    algorithm, debug: true, local_search_max_steps: 3000,
   });
   return data;
 }
 
-export async function compareLab2Scenario(scenarioId: string): Promise<Lab2Comparison> {
+export async function compareLab2Scenario(scenario: Lab2Scenario): Promise<Lab2Comparison> {
   const { data } = await client.post<Lab2Comparison>("/api/lab2/compare", {
-    scenario_id: scenarioId, debug: true, local_search_max_steps: 3000,
+    scenario_id: scenario.scenario_id,
+    scenario: { ...scenario, id: scenario.scenario_id },
+    debug: true, local_search_max_steps: 3000,
   });
   return data;
 }

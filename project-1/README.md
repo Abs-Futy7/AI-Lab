@@ -1271,7 +1271,7 @@ Min-Conflicts is not complete: reaching the step limit does not prove that no so
 
 ## Scenario generation and fair comparison
 
-Generation is deterministic for a given request and seed. Incidents are sampled only from nodes in the loaded Lab-1 graph. A scenario ID is derived from the normalized generation configuration and the frozen scenario is kept in an in-process bounded cache.
+Generation is deterministic for a given request and seed. Incidents are sampled only from nodes in the loaded Lab-1 graph. A scenario ID is derived from the normalized generation configuration and the frozen scenario is kept in an in-process bounded cache. The browser also returns that frozen scenario with solve/compare requests, so separate serverless instances use identical state without regenerating incidents.
 
 | Preset | Incidents | Ambulances | Fire units | Rescue teams |
 |---|---:|---:|---:|---:|
@@ -1415,7 +1415,7 @@ npm run build
 - One resource handles at most one simultaneous requirement; shift duration and later reuse are outside this CSP.
 - Budgets are per requirement in this first formulation, not a shared multi-resource incident budget.
 - The six fixed centers make center-to-incident route caching possible; per-vehicle live positions are not modeled.
-- Scenarios are held in process memory. A serverless cold start or deployment can expire an ID, in which case the API asks the client to regenerate it.
+- Scenarios are cached in process memory for ordinary API clients. The included browser additionally carries the frozen scenario into solve/compare requests, so Vercel cold starts do not invalidate an active browser experiment.
 - Large scenarios can produce a large inspector response because pruning evidence is intentionally retained for teaching.
 - Min-Conflicts may stop with residual conflicts and is correctly reported as partial rather than falsely declared impossible.
 - The system is educational and must not be used for real dispatch or safety decisions.
