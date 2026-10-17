@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Ambulance, MapPinned, Radio, ShieldAlert } from "lucide-react";
 
@@ -131,6 +132,7 @@ export default function RoutingDashboard() {
       <header className="topbar">
         <div className="brand-mark"><Ambulance size={24} /></div>
         <div className="brand-copy"><span>AI TRANSPORT LAB / 01</span><h1>Emergency Route Intelligence</h1></div>
+        <Link className="lab-nav-link" href="/lab2">Open Lab 2 · CSP</Link>
         <div className="topbar-status"><span><Radio size={14} /> Simulation online</span><span><MapPinned size={14} /> Central Dhaka · 3 km</span></div>
       </header>
       {error && <div className="error-banner" role="alert"><ShieldAlert size={18} /><span>{error}</span><button onClick={() => setError(null)} type="button">Dismiss</button></div>}

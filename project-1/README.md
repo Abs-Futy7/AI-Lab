@@ -1,5 +1,7 @@
 # Emergency Vehicle Routing with AI Search
 
+> **Live demos:** [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1) · [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2) · [Six-algorithm route simulation](https://ai-lab-project-1.vercel.app/simulation)
+
 [**Live application**](https://ai-lab-project-1.vercel.app) · [**Six-algorithm live simulation**](https://ai-lab-project-1.vercel.app/simulation)
 
 An interactive AI laboratory project that compares six manually implemented search algorithms on a real directed OpenStreetMap road network in central Dhaka.
@@ -1014,8 +1016,8 @@ two independently built services:
 
 | Service | Source directory | Framework | Public route |
 |---|---|---|---|
-| `backend` | `project-1/backend` | FastAPI | `/api/*` |
-| `frontend` | `project-1/frontend` | Next.js | all other paths |
+| `backend` | `Project 1/backend` | FastAPI | `/api/*` |
+| `frontend` | `Project 1/frontend` | Next.js | all other paths |
 
 Import `Abs-Futy7/AI-Lab` in Vercel and keep the repository root as the Root
 Directory. Vercel reads `vercel.json`, builds both services, and publishes them
@@ -1114,3 +1116,306 @@ Any added algorithm should use the same frozen graph, centralized cost function,
 ## Academic implementation note
 
 The graph libraries are infrastructure, not search solvers. The project does not call NetworkX shortest-path, Dijkstra, A*, BFS, or DFS route functions, and it does not call OSMnx route-solving helpers. This makes the repository suitable for demonstrating the internal behavior of the algorithms required by the course slides.
+
+---
+
+# Lab 2 — Dhaka Emergency Response Resource Allocation System
+
+Lab 2 is a separate Constraint Satisfaction Problem (CSP) demonstration. It does not replace or merge with Lab 1. Lab 1 answers “which road route should one vehicle use?”; Lab 2 answers “which physical resources can be assigned to many simultaneous incidents without violating any hard constraint?” It calls the Lab-1 routing layer to evaluate reachability, distance, travel time, and route geometry for each candidate dispatch.
+
+- Lab-1 page: `/lab1`
+- Lab-2 page: `/lab2`
+- Lab-1 synchronized search playback: `/simulation`
+- Lab-2 API prefix: `/api/lab2`
+
+## Lab-2 problem statement
+
+The simulation generates medical, fire, road-accident, and flood/rescue incidents on valid nodes of the Central Dhaka road graph. Ambulances, fire units, and rescue teams begin at six fixed simulated resource centers. The task is to find a consistent allocation in which every incident-resource requirement receives a compatible, available, capable, reachable, timely, affordable, and unique physical resource.
+
+This is deliberately a satisfaction problem, not a global cost optimizer. Distance, response time, and cost help reject infeasible values and deterministically order feasible values. The system does not use linear programming, Hungarian assignment, minimum-cost flow, genetic algorithms, reinforcement learning, OR-Tools, Z3, MiniZinc, or a CSP library.
+
+## Formal CSP formulation
+
+The CSP is the tuple `(X, D, C)`:
+
+- `X` is the set of incident-resource requirement variables.
+- `D(Xi)` is the set of physical resource IDs that could satisfy variable `Xi`.
+- `C` is the collection of unary feasibility constraints and the pairwise all-different constraint.
+
+If `INC-014` is a high-severity fire requiring one fire unit and one ambulance, the model creates two variables:
+
+```text
+INC-014_FIRE_UNIT_1
+INC-014_AMBULANCE_1
+```
+
+The domain of the ambulance variable initially contains only ambulance IDs. Domain generation records `before`, every removed candidate and its reason, `after`, and the first LCV order used by the solver. These are real values displayed by the UI inspector.
+
+### Configurable incident requirements
+
+The mapping lives in `backend/app/emergency/presets.py`, outside the algorithms:
+
+| Incident type | Base requirement | Additional requirement at severity 4–5 |
+|---|---|---|
+| Medical | 1 ambulance | none |
+| Fire | 1 fire unit | 1 ambulance |
+| Road accident | 1 ambulance | 1 rescue team |
+| Flood / rescue | 1 rescue team | 1 ambulance |
+
+Changing this mapping does not require changing AC-3, Backtracking, Backjumping, or Min-Conflicts.
+
+## Hard constraints
+
+1. **Type compatibility:** a domain contains only resources of the required type.
+2. **Availability:** an unavailable resource is removed during domain generation.
+3. **Road accessibility:** Lab-1 A* must find a route on the frozen scenario graph; otherwise the resource is removed.
+4. **Deadline:** estimated route travel time must be no greater than the incident deadline.
+5. **Budget:** `dispatch_cost + (distance_km × 45)` must be within the incident budget.
+6. **Capacity:** resource capacity must be at least the requirement capacity, which is derived from severity.
+7. **No double allocation:** one physical resource cannot satisfy two simultaneous variables. This global all-different rule is represented by binary inequality arcs between variables whose domains overlap.
+
+The travel-time estimate uses the Lab-1 road distance and its simulated traffic and condition values:
+
+```text
+edge_minutes = distance_m / (25,000 m / 60 min)
+               × (1 + 1.5 × traffic + 0.5 × road_condition)
+```
+
+It is a documented educational estimate, not a live ETA.
+
+## Domain construction and route reuse
+
+`backend/app/csp/domains.py` performs the following steps:
+
+1. Create one variable for every required resource slot.
+2. Select resources with the matching type.
+3. Remove unavailable or insufficient-capacity resources.
+4. Ask the reused Lab-1 routing service for the candidate route.
+5. Remove unreachable, late, or over-budget candidates.
+6. Store route, distance, travel time, cost, and pruning evidence.
+7. Create the sparse all-different neighbor graph.
+
+Candidate routes are cached by `(resource_center_id, incident_id)` during a scenario build. All same-type vehicles at one center therefore share one road computation instead of rerunning A* for every vehicle. The resulting base CSP is also cached for the frozen scenario, while each solver receives its own clone.
+
+## AC-3 arc consistency
+
+`backend/app/csp/ac3.py` manually implements `AC-3` and `REVISE` with a queue of directed arcs. For an arc `(Xi, Xj)`, value `r` is removed from `D(Xi)` when there is no value in `D(Xj)` satisfying `r != value_j`. If a domain becomes empty, preprocessing immediately reports that the instance is unsatisfiable under the selected conditions.
+
+Recorded metrics are:
+
+- `initial_domain_values`: compatible values before unary filters;
+- `final_domain_values`: values remaining after unary filters and AC-3;
+- `domain_values_pruned`: initial minus final;
+- `arc_revisions`: directed arcs removed from the AC-3 queue;
+- `constraint_checks`: binary inequality checks performed.
+
+## Variable and value heuristics
+
+The exact deterministic ordering is implemented in `backend/app/csp/heuristics.py`.
+
+### MRV, severity, and Degree
+
+The next variable is selected by this tuple:
+
+```text
+(fewest legal values, highest severity, highest dynamic degree, stable variable ID)
+```
+
+MRV exposes failures early. Severity prioritizes the more critical emergency when MRV ties. Degree chooses the variable constraining the most still-unassigned neighbors. The final variable ID tie-break keeps repeated demonstrations deterministic.
+
+### Least Constraining Value
+
+LCV counts how many unassigned neighbor domains contain each candidate resource. The resource eliminating the fewest neighbor choices is tried first. Equal-impact candidates are ordered by shorter travel time and then stable resource ID. LCV is a preference, not an additional correctness constraint.
+
+## Backtracking
+
+`backend/app/csp/backtracking.py` is a standard recursive depth-first CSP solver:
+
+1. Return when the assignment contains every variable.
+2. Select the next variable with MRV/severity/Degree.
+3. Try values in LCV order.
+4. Reject a value if it conflicts with an assigned neighbor.
+5. Assign it and forward-check by temporarily removing the same resource from unassigned neighbors.
+6. Recurse; on failure restore every removal and undo the assignment.
+
+It records nodes visited, assignments attempted, backtracks, maximum depth, MRV selections, LCV evaluations, constraint checks, and measured backend runtime.
+
+## Conflict-Directed Backjumping
+
+`backend/app/csp/backjumping.py` is separate from Backtracking. It examines every domain value, including values already used by earlier assignments, so it can identify the actual variables responsible for failure. When all values fail, their culprits form a conflict set. A failure propagates past an assigned variable that is absent from that set. When it reaches the most recent relevant variable, the solver records a backjump and its jump distance instead of chronologically retrying irrelevant variables.
+
+With debug mode enabled, up to 40 real events are returned:
+
+```json
+{
+  "failed_variable": "INC-017_RESCUE_TEAM_1",
+  "conflict_set": ["INC-004_RESCUE_TEAM_1", "INC-011_RESCUE_TEAM_1"],
+  "skipped": ["INC-016_FIRE_UNIT_1"],
+  "jumped_to": "INC-011_RESCUE_TEAM_1"
+}
+```
+
+The content depends on the actual run and is never hard-coded in the UI.
+
+## Local Search / Min-Conflicts
+
+`backend/app/csp/local_search.py` is a fundamentally different solver:
+
+1. Create a complete, possibly conflicting deterministic assignment.
+2. Find all variables whose chosen resource is duplicated by a neighbor.
+3. Select a conflicted variable with the seeded pseudo-random generator.
+4. Choose the value producing the fewest conflicts, breaking ties by travel time and resource ID.
+5. Repeat until the conflict count is zero or `local_search_max_steps` is reached.
+
+Min-Conflicts is not complete: reaching the step limit does not prove that no solution exists. The response includes initial/final conflicts, steps, repairs, runtime, and sampled conflict history for the chart.
+
+## Scenario generation and fair comparison
+
+Generation is deterministic for a given request and seed. Incidents are sampled only from nodes in the loaded Lab-1 graph. A scenario ID is derived from the normalized generation configuration and the frozen scenario is kept in an in-process bounded cache.
+
+| Preset | Incidents | Ambulances | Fire units | Rescue teams |
+|---|---:|---:|---:|---:|
+| Small | 30 | 36 | 20 | 20 |
+| Medium | 100 | 115 | 60 | 60 |
+| Large | 300 | 345 | 180 | 180 |
+
+Availability policy scales those starting counts and also determines the simulated unavailable rate. Custom incident counts select the nearest sufficient preset tier unless manual counts are supplied.
+
+Deadline policies start at 30, 60, or 120 minutes. Incident severity tightens the individual deadline moderately. Road policies map to the existing Lab-1 scenario engine: normal, flood/some-blocked, and combined-emergency/heavy-disruption.
+
+`Compare All` does not regenerate anything. It builds or retrieves one CSP for the requested scenario, clones domains, neighbors, metrics, and inspector state, and runs all three algorithms against identical incidents, resources, routes, road closures, deadlines, budgets, capacities, availability, and seed.
+
+## Lab-2 interface
+
+The dedicated `/lab2` page contains:
+
+- scenario scale, algorithm, deadline, road, availability, and seed controls;
+- separate Generate, Solve, and Compare All actions;
+- incident and center markers on Leaflet;
+- animated real road-route allocations with play, pause, and replay;
+- total incidents, CSP variables, resources, allocations, and violations;
+- solver-specific metrics and measured runtime;
+- a same-scenario comparison view;
+- the real domain-pruning inspector and LCV order;
+- Backjump trace or Min-Conflicts history;
+- allocated and unallocated requirement details;
+- a visible MRV, severity, Degree, LCV, and AC-3 explanation panel.
+
+The map automatically frames the generated centers and incidents without shaking during allocation playback.
+
+## Lab-2 API
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/lab2/config` | Presets, algorithms, mappings, and heuristic policy |
+| `GET` | `/api/lab2/resources?scenario_id=...` | Centers and resources for a scenario |
+| `POST` | `/api/lab2/scenario/generate` | Generate and freeze a reproducible scenario |
+| `POST` | `/api/lab2/solve` | Solve an existing scenario with one selected algorithm |
+| `POST` | `/api/lab2/compare` | Run all three algorithms on clones of one scenario |
+
+Example workflow:
+
+```bash
+curl -X POST http://localhost:8000/api/lab2/scenario/generate \
+  -H "Content-Type: application/json" \
+  -d '{"scale":"small","deadline_policy":"normal","road_scenario":"normal","resource_availability":"normal","seed":42}'
+
+curl -X POST http://localhost:8000/api/lab2/solve \
+  -H "Content-Type: application/json" \
+  -d '{"scenario_id":"LAB2-...","algorithm":"backjumping","debug":true}'
+```
+
+Use the returned real `scenario_id` in the second request.
+
+## Metric definitions
+
+| Metric | Meaning |
+|---|---|
+| `solution_found` | Every CSP variable is assigned with no hard conflict |
+| `requirements_allocated` | Valid resource assignments returned to the frontend |
+| `requirements_unallocated` | Required slots absent from the valid returned assignment |
+| `nodes_visited` | Recursive states for exact search; repair iterations for Local Search |
+| `assignments_attempted` | Candidate assignments inspected by the active solver |
+| `backtracks` | Failed recursive Backtracking calls |
+| `backjumps` | Recorded non-chronological Conflict-Directed Backjump events |
+| `jump_distance_total` | Sum of skipped levels plus the jump target transition |
+| `steps` | Min-Conflicts repair-loop iterations |
+| `repairs` | Min-Conflicts assignments that changed a variable's value |
+| `conflicts_initial/final` | Duplicate-resource constraint violations before/after Local Search |
+| `runtime_ms` | Solver execution only; route-domain preparation and UI animation are separate |
+| `average_response_time` | Mean estimated route time of valid returned allocations |
+| `average_distance_m` | Mean Lab-1 route distance of valid returned allocations |
+| `total_dispatch_cost` | Sum of the simple dispatch-plus-distance costs |
+
+Because exact-search nodes and Local Search repairs are different operations, the interface names them separately instead of implying that they are directly identical work units.
+
+## Lab-2 source layout
+
+```text
+backend/app/
+|-- emergency/
+|   |-- models.py                 request, incident, resource, and scenario models
+|   |-- presets.py                requirements, scales, and deadline assumptions
+|   |-- resource_centers.py       fixed Central Dhaka centers
+|   `-- scenario_generator.py     seeded incidents and resources
+|-- csp/
+|   |-- model.py                  variables, candidate metadata, state, and metrics
+|   |-- domains.py                domain creation and route-based filtering
+|   |-- constraints.py            all-different checks and conflict counting
+|   |-- ac3.py                    manual AC-3 and REVISE
+|   |-- heuristics.py             MRV, severity, Degree, and LCV
+|   |-- backtracking.py           recursive search and forward checking
+|   |-- backjumping.py            conflict sets and non-chronological jumps
+|   `-- local_search.py           seeded Min-Conflicts repair
+`-- services/lab2_service.py      frozen scenarios, solve, compare, serialization
+
+frontend/
+|-- app/lab1/page.tsx
+|-- app/lab2/page.tsx
+|-- app/lab2/lab2.css
+|-- components/lab2/Lab2Dashboard.tsx
+|-- components/lab2/EmergencyMap.tsx
+`-- types/lab2.ts
+```
+
+## Running both labs locally
+
+Backend, from `backend/`:
+
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe -m uvicorn main:app --reload
+```
+
+Frontend, from `frontend/` in a second terminal:
+
+```powershell
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000/lab1` and `http://localhost:3000/lab2`. The local frontend environment should route `/api` to `http://localhost:8000` as described in the Lab-1 setup section. Swagger remains available at `http://localhost:8000/docs`.
+
+Run verification:
+
+```powershell
+cd backend
+.\venv\Scripts\python.exe -m pytest tests -q
+
+cd ..\frontend
+npm run build
+```
+
+## Lab-2 assumptions and limitations
+
+- All emergencies, costs, capacities, availability, severity, and deadlines are simulated.
+- Resource-center coordinates are fixed for a scenario and are not a live government-service directory.
+- The road graph is real OSM topology, while traffic and disruption attributes are deterministic teaching data.
+- No live hospital, fire-service, weather, traffic, or emergency feed is used.
+- One resource handles at most one simultaneous requirement; shift duration and later reuse are outside this CSP.
+- Budgets are per requirement in this first formulation, not a shared multi-resource incident budget.
+- The six fixed centers make center-to-incident route caching possible; per-vehicle live positions are not modeled.
+- Scenarios are held in process memory. A serverless cold start or deployment can expire an ID, in which case the API asks the client to regenerate it.
+- Large scenarios can produce a large inspector response because pruning evidence is intentionally retained for teaching.
+- Min-Conflicts may stop with residual conflicts and is correctly reported as partial rather than falsely declared impossible.
+- The system is educational and must not be used for real dispatch or safety decisions.

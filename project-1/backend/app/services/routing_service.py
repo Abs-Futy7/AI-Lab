@@ -16,7 +16,15 @@ from app.config import settings
 from app.graph.helpers import edge_segment, nodes_to_coordinates
 from app.graph.loader import get_base_graph, nearest_node
 from app.graph.scenarios import apply_scenario
-from app.models.schemas import AlgorithmName, CompareRequest, CostWeights, NetworkScale, RouteRequest
+from app.emergency.models import RoadScenario
+from app.models.schemas import (
+    AlgorithmName,
+    CompareRequest,
+    CostWeights,
+    NetworkScale,
+    RouteRequest,
+    ScenarioName,
+)
 
 HEURISTIC_EXPLANATION = (
     "h(n) = w_distance × straight-line distance(n, goal). Straight-line distance is a "
@@ -240,3 +248,46 @@ def calculate_route(request: RouteRequest) -> dict[str, Any]:
     return serialize_result(
         graph, source, destination, raw, metadata, layers
     )
+
+
+def prepare_lab2_road_graph(road_scenario: RoadScenario, seed: int) -> nx.MultiDiGraph:
+    """Reuse Lab-1's graph and road-scenario engine for one frozen Lab-2 run."""
+    mapping = {
+        RoadScenario.normal: ScenarioName.normal,
+        RoadScenario.some_blocked: ScenarioName.flood,
+        RoadScenario.heavy_disruption: ScenarioName.combined_emergency,
+    }
+    graph, _ = apply_scenario(get_base_graph(), mapping[road_scenario], seed)
+    return graph
+
+
+def calculate_lab2_candidate_route(
+    graph: nx.MultiDiGraph,
+    source_lat: float,
+    source_lon: float,
+    destination_lat: float,
+    destination_lon: float,
+) -> dict[str, Any]:
+    """Route a CSP candidate with Lab-1 A* and return compact dispatch metadata."""
+    source = nearest_node(graph, source_lat, source_lon)
+    destination = nearest_node(graph, destination_lat, destination_lon)
+    distance_weights = CostWeights(distance=1.0, traffic=0.0, condition=0.0, risk=0.0)
+    raw = astar_search(graph, source, destination, distance_weights, settings.max_expansions)
+    if not raw["found"]:
+        return {"found": False, "distance_m": 0.0, "travel_time_minutes": 0.0, "route": []}
+
+    travel_minutes = 0.0
+    for edge_ref in raw["path_edges"]:
+        edge = graph[edge_ref["u"]][edge_ref["v"]][edge_ref["key"]]
+        distance_m = float(edge.get("distance_m", edge.get("length", 1.0)))
+        traffic = float(edge.get("traffic", 0.0))
+        condition = float(edge.get("road_condition", 0.0))
+        # A documented educational travel-time estimate: 25 km/h base speed,
+        # slowed by the same simulated traffic/condition attributes as Lab-1.
+        travel_minutes += distance_m / (25_000 / 60) * (1 + 1.5 * traffic + 0.5 * condition)
+    return {
+        "found": True,
+        "distance_m": float(raw["path_distance_m"]),
+        "travel_time_minutes": travel_minutes,
+        "route": nodes_to_coordinates(graph, raw["path_nodes"]),
+    }

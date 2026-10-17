@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import type { CompareResponse, ComparisonRequest, RouteRequest, SearchResult } from "@/types/routing";
+import type { CSPAlgorithm, Lab2Comparison, Lab2GenerateRequest, Lab2Result, Lab2Scenario } from "@/types/lab2";
 
 const client = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "",
@@ -16,6 +17,28 @@ export async function compareRoutes(
   request: ComparisonRequest,
 ): Promise<CompareResponse> {
   const { data } = await client.post<CompareResponse>("/api/compare", request);
+  return data;
+}
+
+export async function generateLab2Scenario(request: Lab2GenerateRequest): Promise<Lab2Scenario> {
+  const { data } = await client.post<Lab2Scenario>("/api/lab2/scenario/generate", request);
+  return data;
+}
+
+export async function solveLab2Scenario(
+  scenarioId: string,
+  algorithm: CSPAlgorithm,
+): Promise<Lab2Result> {
+  const { data } = await client.post<Lab2Result>("/api/lab2/solve", {
+    scenario_id: scenarioId, algorithm, debug: true, local_search_max_steps: 3000,
+  });
+  return data;
+}
+
+export async function compareLab2Scenario(scenarioId: string): Promise<Lab2Comparison> {
+  const { data } = await client.post<Lab2Comparison>("/api/lab2/compare", {
+    scenario_id: scenarioId, debug: true, local_search_max_steps: 3000,
+  });
   return data;
 }
 
