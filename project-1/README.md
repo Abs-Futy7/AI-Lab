@@ -1292,6 +1292,7 @@ The dedicated `/lab2` page contains:
 - scenario scale, algorithm, deadline, road, availability, and seed controls;
 - separate Generate, Solve, and Compare All actions;
 - incident and center markers on Leaflet;
+- recognizable ambulance/medical, fire, accident, flood, and rescue signs instead of plain color-only markers;
 - animated real road-route allocations with play, pause, and replay;
 - total incidents, CSP variables, resources, allocations, and violations;
 - solver-specific metrics and measured runtime;

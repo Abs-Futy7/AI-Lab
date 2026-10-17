@@ -1,14 +1,32 @@
 "use client";
 
 import { useEffect } from "react";
-import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
-import { latLngBounds } from "leaflet";
+import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { divIcon, latLngBounds } from "leaflet";
 
 import type { Lab2Allocation, Lab2Center, Lab2Incident } from "@/types/lab2";
 
 const routeColors: Record<string, string> = {
   AMBULANCE: "#2563eb", FIRE_UNIT: "#e11d48", RESCUE_TEAM: "#059669",
 };
+
+const centerSymbols: Record<string, string> = {
+  AMBULANCE: "🚑", FIRE_UNIT: "🚒", RESCUE_TEAM: "🛟",
+};
+
+const incidentSymbols: Record<string, string> = {
+  MEDICAL: "✚", FIRE: "🔥", ROAD_ACCIDENT: "⚠️", FLOOD_RESCUE: "🌊",
+};
+
+function signedMarker(symbol: string, kind: string, critical = false) {
+  return divIcon({
+    className: "emergency-marker-shell",
+    html: `<span class="emergency-map-marker ${kind}${critical ? " critical" : ""}">${symbol}</span>`,
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    tooltipAnchor: [0, -20],
+  });
+}
 
 function AutoFrame({ centers, incidents }: { centers: Lab2Center[]; incidents: Lab2Incident[] }) {
   const map = useMap();
@@ -42,21 +60,23 @@ export default function EmergencyMap({
           </Polyline>
         ))}
         {centers.map((center) => (
-          <CircleMarker key={center.id} center={[center.latitude, center.longitude]} radius={9}
-            pathOptions={{ color: "#0f172a", fillColor: routeColors[center.center_type] ?? "#475569", fillOpacity: .95, weight: 2 }}>
+          <Marker key={center.id} position={[center.latitude, center.longitude]}
+            icon={signedMarker(centerSymbols[center.center_type] ?? "✚", `center ${center.center_type.toLowerCase()}`)}>
             <Tooltip direction="top"><strong>{center.name}</strong><br />{center.center_type.replaceAll("_", " ")}</Tooltip>
-          </CircleMarker>
+          </Marker>
         ))}
         {incidents.map((incident) => (
-          <CircleMarker key={incident.id} center={[incident.latitude, incident.longitude]} radius={4 + incident.severity}
-            pathOptions={{ color: "#fff", fillColor: incident.severity >= 4 ? "#dc2626" : "#f59e0b", fillOpacity: .9, weight: 2 }}>
-            <Tooltip direction="top"><strong>{incident.id} · {incident.type.replaceAll("_", " ")}</strong><br />Severity {incident.severity} · {incident.deadline_minutes} min</Tooltip>
-          </CircleMarker>
+          <Marker key={incident.id} position={[incident.latitude, incident.longitude]}
+            icon={signedMarker(incidentSymbols[incident.type] ?? "!", `incident ${incident.type.toLowerCase()}`, incident.severity >= 4)}>
+            <Tooltip direction="top"><strong>{incident.id} · {incident.type.replaceAll("_", " ")}</strong><br />Severity {incident.severity} · {incident.deadline_minutes} min<br />Assigned: {allocations.filter((item) => item.incident_id === incident.id).map((item) => item.resource_id).join(", ") || "pending"}</Tooltip>
+          </Marker>
         ))}
       </MapContainer>
       <div className="lab2-map-legend">
-        <span><i className="legend-center" /> Resource center</span>
-        <span><i className="legend-incident" /> Incident</span>
+        <span><b>🚑</b> Ambulance / medical</span>
+        <span><b>🚒</b> Fire service</span>
+        <span><b>🛟</b> Rescue</span>
+        <span><b>⚠️</b> Incident</span>
         <span><i className="legend-route" /> Live allocation route</span>
       </div>
     </div>

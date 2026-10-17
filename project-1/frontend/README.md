@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Lab Frontend
 
-## Getting Started
+The Next.js frontend contains two separate university AI laboratory demonstrations built with React, TypeScript, Raleway, Leaflet, and Recharts.
 
-First, run the development server:
+## Live application
 
-```bash
+- [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1)
+- [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2)
+- [Lab 1 — Synchronized six-algorithm simulation](https://ai-lab-project-1.vercel.app/simulation)
+- [Application root](https://ai-lab-project-1.vercel.app)
+
+## Pages
+
+### Lab 1: `/lab1`
+
+Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka road graph. It includes scenario controls, weighted costs, expanded nodes, graph coverage, route analysis, and a separate synchronized comparison window.
+
+### Lab 2: `/lab2`
+
+Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; fixed emergency centers; symbol-based ambulance, medical, fire, accident, and rescue markers; actual road-route allocations; solver traces; and same-scenario comparison charts.
+
+## Local development
+
+Start the FastAPI backend first, then run:
+
+```powershell
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000/lab1
+http://localhost:3000/lab2
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Raleway throughout the interface.
+Create `frontend/.env.local` when running the frontend and backend separately:
 
-## Learn More
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Production verification
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+npm run build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The repository-level `vercel.json` deploys this directory as the `frontend` service and routes `/api/*` to the separate FastAPI service.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See the [complete project documentation](../README.md) for the architecture, algorithms, API, CSP formulation, tests, assumptions, and backend setup.
