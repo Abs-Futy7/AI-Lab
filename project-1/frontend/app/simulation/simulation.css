@@ -117,6 +117,7 @@
 .algorithm-simulation-card > footer small { display: block; overflow: hidden; color: #7b8da5; font-size: 9px; font-weight: 850; text-overflow: ellipsis; text-transform: uppercase; }
 .algorithm-simulation-card > footer strong { display: block; overflow: hidden; margin-top: 4px; color: #334155; font: 750 12px/1 var(--font-raleway), sans-serif; text-overflow: ellipsis; }
 .comparison-footnote { margin: 12px 2px 0; color: #53657b; font-size: 11px; line-height: 1.5; text-align: center; }
+.comparison-simulation-shell .card-state,.comparison-simulation-shell .best-path-badge { font-size: 9px; }.comparison-simulation-shell .algorithm-simulation-card header p { font-size: 11px; }.comparison-simulation-shell .algorithm-simulation-card > footer small { font-size: 10px; }.comparison-simulation-shell .algorithm-simulation-card > footer strong { font-size: 13px; }.comparison-simulation-shell .graph-coverage-caption { font-size: 10px; }.comparison-simulation-shell .comparison-footnote { font-size: 12px; }
 
 @media (max-width: 1220px) {
   .best-path-analysis { grid-template-columns: 1fr; }

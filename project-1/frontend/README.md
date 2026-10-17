@@ -17,7 +17,7 @@ Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka 
 
 ### Lab 2: `/lab2`
 
-Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; compact symbol-based emergency markers; closer map framing; actual road-route allocations; fleet/station readiness; a previous/next allocation-step visualizer; solver traces; and same-scenario comparison charts.
+Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; compact symbol-based emergency markers; closer map framing; actual road-route allocations; fleet/station readiness; a previous/next allocation-step visualizer; readable algorithm flow diagrams; radar/scatter/donut comparisons; and labeled conflict-history charts.
 
 ## Local development
 

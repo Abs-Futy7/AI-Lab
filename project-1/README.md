@@ -1299,8 +1299,11 @@ The dedicated `/lab2` page contains:
 - total incidents, CSP variables, resources, allocations, and violations;
 - solver-specific metrics and measured runtime;
 - a same-scenario comparison view;
+- radar, scatter, and allocation-donut visualizations with labeled axes and explanatory legends;
+- algorithm-specific search-flow diagrams and an axis-labeled Min-Conflicts history chart instead of empty trace panels;
 - expanded-node, runtime, weighted-cost, and route-distance graphs in the six-algorithm Lab-1 comparison window;
 - the real domain-pruning inspector and LCV order;
+- larger interface typography and explicit domain-retention/pruning labels;
 - Backjump trace or Min-Conflicts history;
 - allocated and unallocated requirement details;
 - a visible MRV, severity, Degree, LCV, and AC-3 explanation panel.

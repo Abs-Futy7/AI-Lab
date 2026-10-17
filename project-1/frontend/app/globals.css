@@ -184,6 +184,9 @@ td.best { color: #15803d; background: #f0fdf4; font-weight: 900; }
 .error-banner button { border: 0; background: transparent; color: #9f1239; font-size: 9px; font-weight: 900; text-transform: uppercase; }
 footer { display: flex; justify-content: space-between; padding: 18px 2px 0; color: #94a3b8; font-size: 10px; }
 
+/* Readable type scale across the Lab-1 dashboard */
+.dashboard-shell .eyebrow,.dashboard-shell .brand-copy span { font-size: 12px; }.dashboard-shell .topbar-status span,.dashboard-shell .topbar > .lab-nav-link { font-size: 12px; }.dashboard-shell .location-head legend,.dashboard-shell .field-label > span,.dashboard-shell .section-title { font-size: 13px; }.dashboard-shell .select-field { font-size: 13px; }.dashboard-shell .coordinate-grid input { font-size: 12px; }.dashboard-shell .primary-button,.dashboard-shell .secondary-button { font-size: 13px; }.dashboard-shell .toggle-item,.dashboard-shell .slider-row span,.dashboard-shell .slider-row output { font-size: 11px; }.dashboard-shell .map-legend span,.dashboard-shell .graph-coverage-tooltip { font-size: 11px; }.dashboard-shell .metric-item div span,.dashboard-shell .muted-copy,.dashboard-shell .section-header p { font-size: 12px; }.dashboard-shell .metric-item strong { font-size: 17px; }.dashboard-shell table { font-size: 12px; }.dashboard-shell th { font-size: 10px; }.dashboard-shell .assumptions-panel > p,.dashboard-shell .assumptions-panel li { font-size: 11px; }.dashboard-shell footer { font-size: 11px; }
+
 /* Dedicated six-algorithm simulation window */
 .comparison-simulation-shell { min-height: 100vh; padding: 0 18px 18px; background: #e9eff5; }
 .simulation-window-header { min-height: 72px; display: grid; grid-template-columns: 180px 1fr auto; align-items: center; gap: 16px; border-bottom: 1px solid #cfd9e4; }
