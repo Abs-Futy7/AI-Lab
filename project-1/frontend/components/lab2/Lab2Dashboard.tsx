@@ -102,7 +102,7 @@ export default function Lab2Dashboard() {
       <header className="lab2-topbar">
         <div className="lab2-brand"><Ambulance size={23} /></div>
         <div><span className="eyebrow">AI LAB / 02 · CONSTRAINT SATISFACTION</span><h1>Dhaka Emergency Resource Allocation</h1></div>
-        <nav><Link href="/lab1">Lab 1 · Route Search</Link><Link className="active" href="/lab2">Lab 2 · CSP</Link></nav>
+        <nav><Link href="/">Projects</Link><Link href="/lab1">Lab 1 · Route Search</Link><Link className="active" href="/lab2">Lab 2 · CSP</Link></nav>
       </header>
 
       {error && <div className="lab2-error"><ShieldAlert size={18} /><span>{error}</span><button onClick={() => setError(null)}>Dismiss</button></div>}

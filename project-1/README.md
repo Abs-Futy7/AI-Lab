@@ -1,6 +1,6 @@
 # Emergency Vehicle Routing with AI Search
 
-> **Live demos:** [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1) · [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2) · [Six-algorithm route simulation](https://ai-lab-project-1.vercel.app/simulation)
+> **Live demos:** [Project directory](https://ai-lab-project-1.vercel.app) · [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1) · [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2) · [Six-algorithm route simulation](https://ai-lab-project-1.vercel.app/simulation)
 
 [**Live application**](https://ai-lab-project-1.vercel.app) · [**Six-algorithm live simulation**](https://ai-lab-project-1.vercel.app/simulation)
 

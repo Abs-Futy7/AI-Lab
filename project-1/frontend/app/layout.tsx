@@ -10,8 +10,8 @@ const raleway = Raleway({
 });
 
 export const metadata: Metadata = {
-  title: "Emergency Route Intelligence",
-  description: "AI search algorithm visualizer on the Dhaka road network",
+  title: "AI Laboratory Projects",
+  description: "Interactive AI search and constraint-satisfaction laboratory projects",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

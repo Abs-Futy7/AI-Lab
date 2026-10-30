@@ -8,6 +8,7 @@ Full documentation: [project-1/README.md](./project-1/README.md)
 
 ### Live application
 
+- [Project directory landing page](https://ai-lab-project-1.vercel.app)
 - [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1)
 - [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2)
 - [Lab 1 — Synchronized six-algorithm simulation](https://ai-lab-project-1.vercel.app/simulation)

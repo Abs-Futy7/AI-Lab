@@ -7,9 +7,13 @@ The Next.js frontend contains two separate university AI laboratory demonstratio
 - [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1)
 - [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2)
 - [Lab 1 — Synchronized six-algorithm simulation](https://ai-lab-project-1.vercel.app/simulation)
-- [Application root](https://ai-lab-project-1.vercel.app)
+- [Project directory landing page](https://ai-lab-project-1.vercel.app)
 
 ## Pages
+
+### Project directory: `/`
+
+The application opens on a responsive project-selection page. Project 01 opens Lab 1 and Project 02 opens Lab 2; each lab includes a Projects link back to this directory.
 
 ### Lab 1: `/lab1`
 
