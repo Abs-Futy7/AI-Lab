@@ -11,7 +11,7 @@ from app.csp.backtracking import solve_backtracking
 from app.csp.constraints import has_enough_distinct_resources
 from app.csp.domains import build_problem
 from app.csp.local_search import solve_min_conflicts
-from app.csp.model import CSPProblem
+from app.csp.model import CSPMetrics, CSPProblem
 from app.emergency.models import (
     CSPAlgorithm,
     CompareLab2Request,
@@ -74,19 +74,13 @@ def list_resources(scenario_id: str | None = None) -> dict[str, Any]:
 def solve(request: SolveRequest) -> dict[str, Any]:
     scenario = _scenario(request.scenario_id, request.scenario)
     problem = _base_problem(scenario).clone()
-    consistent = enforce_arc_consistency(problem)
-    if not consistent:
-        raw = {"solution_found": False, "assignment": {}, "trace": [], "failure_reason": "At least one CSP variable has an empty domain after filtering or AC-3."}
-    elif not has_enough_distinct_resources(problem):
-        raw = {"solution_found": False, "assignment": {}, "trace": [], "failure_reason": "Resource shortage: a resource type has fewer distinct feasible resources than required variables."}
-    elif request.algorithm == CSPAlgorithm.backtracking:
-        raw = solve_backtracking(problem)
-    elif request.algorithm == CSPAlgorithm.backjumping:
-        raw = solve_backjumping(problem, request.debug)
-    else:
-        raw = solve_min_conflicts(
-            problem, scenario.config.seed, request.local_search_max_steps
-        )
+    raw = _solve_problem(
+        problem,
+        request.algorithm,
+        scenario.config.seed,
+        request.debug,
+        request.local_search_max_steps,
+    )
     return _result_payload(scenario, problem, request.algorithm, raw)
 
 
@@ -96,24 +90,110 @@ def compare(request: CompareLab2Request) -> dict[str, Any]:
     results: dict[str, Any] = {}
     for algorithm in CSPAlgorithm:
         problem = base.clone()
-        consistent = enforce_arc_consistency(problem)
-        if not consistent:
-            raw = {"solution_found": False, "assignment": {}, "trace": [], "failure_reason": "At least one CSP variable has an empty domain after filtering or AC-3."}
-        elif not has_enough_distinct_resources(problem):
-            raw = {"solution_found": False, "assignment": {}, "trace": [], "failure_reason": "Resource shortage: a resource type has fewer distinct feasible resources than required variables."}
-        elif algorithm == CSPAlgorithm.backtracking:
-            raw = solve_backtracking(problem)
-        elif algorithm == CSPAlgorithm.backjumping:
-            raw = solve_backjumping(problem, request.debug)
-        else:
-            raw = solve_min_conflicts(
-                problem, scenario.config.seed, request.local_search_max_steps
-            )
+        raw = _solve_problem(
+            problem,
+            algorithm,
+            scenario.config.seed,
+            request.debug,
+            request.local_search_max_steps,
+        )
         results[algorithm.value] = _result_payload(scenario, problem, algorithm, raw)
     return {
         "scenario_id": scenario.id,
         "same_scenario": True,
         "results": results,
+    }
+
+
+def _run_selected_solver(
+    problem: CSPProblem,
+    algorithm: CSPAlgorithm,
+    seed: int,
+    debug: bool,
+    local_search_max_steps: int,
+) -> dict[str, Any]:
+    if algorithm == CSPAlgorithm.backtracking:
+        return solve_backtracking(problem)
+    if algorithm == CSPAlgorithm.backjumping:
+        return solve_backjumping(problem, debug)
+    return solve_min_conflicts(problem, seed, local_search_max_steps)
+
+
+def _maximal_feasible_problem(problem: CSPProblem) -> CSPProblem | None:
+    """Remove impossible requirements, then preserve the largest AC-3-consistent remainder.
+
+    A blocked-road scenario can make one incident requirement unreachable. The
+    complete CSP is correctly unsatisfied, but the control-center visualization
+    should still dispatch resources to every independent feasible requirement.
+    """
+    domains = {name: list(values) for name, values in problem.domains.items()}
+    active = {name for name, values in domains.items() if values}
+    while active:
+        reduced = CSPProblem(
+            variables={name: problem.variables[name] for name in active},
+            domains={name: list(domains[name]) for name in active},
+            candidates={name: problem.candidates[name] for name in active},
+            neighbors={
+                name: problem.neighbors[name] & active for name in active
+            },
+            domain_inspection={
+                name: dict(problem.domain_inspection[name]) for name in active
+            },
+            metrics=CSPMetrics(
+                initial_domain_values=problem.metrics.initial_domain_values
+            ),
+        )
+        if enforce_arc_consistency(reduced):
+            return reduced
+        domains.update(reduced.domains)
+        next_active = {name for name in active if reduced.domains.get(name)}
+        if next_active == active:
+            break
+        active = next_active
+    return None
+
+
+def _solve_problem(
+    problem: CSPProblem,
+    algorithm: CSPAlgorithm,
+    seed: int,
+    debug: bool,
+    local_search_max_steps: int,
+) -> dict[str, Any]:
+    consistent = enforce_arc_consistency(problem)
+    if consistent and has_enough_distinct_resources(problem):
+        return _run_selected_solver(
+            problem, algorithm, seed, debug, local_search_max_steps
+        )
+
+    if not consistent:
+        reduced = _maximal_feasible_problem(problem)
+        if reduced is not None and reduced.variables:
+            raw = _run_selected_solver(
+                reduced, algorithm, seed, debug, local_search_max_steps
+            )
+            for name, inspection in reduced.domain_inspection.items():
+                problem.domain_inspection[name] = inspection
+            problem.metrics = reduced.metrics
+            raw["solution_found"] = False
+            raw["failure_reason"] = (
+                "Some requirements have no feasible resource after road, deadline, "
+                "capacity, budget, or AC-3 filtering. Feasible requirements were "
+                "allocated and are available for playback."
+            )
+            return raw
+        return {
+            "solution_found": False,
+            "assignment": {},
+            "trace": [],
+            "failure_reason": "Every CSP requirement is infeasible after filtering or AC-3.",
+        }
+
+    return {
+        "solution_found": False,
+        "assignment": {},
+        "trace": [],
+        "failure_reason": "Resource shortage: a resource type has fewer distinct feasible resources than required variables.",
     }
 
 
@@ -191,7 +271,10 @@ def _result_payload(
         resource_id = assignment.get(variable_id)
         variable = problem.variables[variable_id]
         if resource_id is None or resource_id in used or resource_id not in problem.candidates[variable_id]:
-            reason = "not assigned" if resource_id is None else "conflicting duplicate allocation"
+            if resource_id is None and not problem.domains[variable_id]:
+                reason = "no feasible resource after constraint filtering"
+            else:
+                reason = "not assigned" if resource_id is None else "conflicting duplicate allocation"
             unallocated.append({"variable": variable_id, "incident_id": variable.incident_id, "reason": reason})
             continue
         used.add(resource_id)

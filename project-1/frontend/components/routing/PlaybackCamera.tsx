@@ -34,8 +34,25 @@ export function PlaybackCamera({
     const expandedCount = result.expanded_nodes.length;
     const totalSteps = expandedCount + result.path.length;
     if (playbackStep >= totalSteps) {
-      if (completedResult.current !== result && result.path.length > 1) {
-        map.fitBounds(result.path.map((point) => [point.lat, point.lng]), { padding: [36, 36] });
+      if (completedResult.current !== result) {
+        const completedNodes = result.path.length > 1
+          ? result.path
+          : result.expanded_nodes;
+        const frameCompletedSearch = () => {
+          map.invalidateSize({ pan: false });
+          if (completedNodes.length === 1) {
+            map.setView([completedNodes[0].lat, completedNodes[0].lng], targetZoom, { animate: false });
+          } else if (completedNodes.length > 1) {
+            map.fitBounds(completedNodes.map((point) => [point.lat, point.lng]), {
+              padding: [24, 24],
+              maxZoom: targetZoom,
+              animate: false,
+            });
+            map.setZoom(Math.min(map.getZoom() + 1, targetZoom), { animate: false });
+          }
+        };
+        window.requestAnimationFrame(frameCompletedSearch);
+        window.setTimeout(frameCompletedSearch, 180);
         completedResult.current = result;
       }
       return;

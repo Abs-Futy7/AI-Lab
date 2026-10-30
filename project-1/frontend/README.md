@@ -17,11 +17,11 @@ The application opens on a responsive project-selection page. Project 01 opens L
 
 ### Lab 1: `/lab1`
 
-Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka road graph. It includes scenario controls, weighted costs, expanded nodes, graph coverage, route analysis, and a synchronized comparison window with expanded-node, runtime, weighted-cost, and route-distance graphs.
+Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka road graph. It includes scenario controls, weighted costs, expanded nodes, graph coverage, route analysis, consistently reframed completed maps, a direct Back to Project 1 action, and a synchronized comparison window with expanded-node, runtime, weighted-cost, and route-distance graphs.
 
 ### Lab 2: `/lab2`
 
-Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; compact symbol-based emergency markers; closer map framing; actual road-route allocations; fleet/station readiness; a previous/next allocation-step visualizer; readable algorithm flow diagrams; radar/scatter/donut comparisons; and labeled conflict-history charts.
+Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; compact symbol-based emergency markers; closer map framing; actual road-route allocations; partial playback when blocked roads make only some requirements infeasible; fleet/station readiness; a previous/next allocation-step visualizer; readable algorithm flow diagrams; radar/scatter/donut comparisons; and labeled conflict-history charts.
 
 ## Local development
 

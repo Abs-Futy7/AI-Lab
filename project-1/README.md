@@ -69,6 +69,7 @@ The README distinguishes textbook properties from the behavior of the exact code
 - Layer controls for the route, expanded nodes, blocked roads, congestion, risk, coverage, and camera framing.
 - Side-by-side result table and expanded-node chart.
 - A separate six-map live simulation using one shared playback timeline.
+- Completed six-map cards consistently reframe the final route; failed searches reframe their explored-node region instead of remaining at full-network coverage.
 - Best-path analysis that favors minimum weighted cost and then search efficiency.
 - FastAPI validation and Swagger documentation.
 - Synthetic-graph tests independent of OpenStreetMap availability.
@@ -1425,4 +1426,5 @@ npm run build
 - Scenarios are cached in process memory for ordinary API clients. The included browser additionally carries the frozen scenario into solve/compare requests, so Vercel cold starts do not invalidate an active browser experiment.
 - Large scenarios can produce a large inspector response because pruning evidence is intentionally retained for teaching.
 - Min-Conflicts may stop with residual conflicts and is correctly reported as partial rather than falsely declared impossible.
+- When blocked roads make individual requirements impossible, Lab 2 keeps the full CSP status partial/unsatisfied but allocates and animates every independent feasible requirement; impossible requirements remain explicitly unallocated.
 - The system is educational and must not be used for real dispatch or safety decisions.

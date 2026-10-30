@@ -15,6 +15,7 @@ from app.emergency.models import (
     ResourceType,
     ScenarioGenerateRequest,
 )
+from app.services.lab2_service import _maximal_feasible_problem
 
 
 def candidate(resource: str, travel: float = 5.0) -> CandidateValue:
@@ -124,6 +125,16 @@ def test_problem_clone_deep_copies_inspector_lists():
     cloned = original.clone()
     cloned.domain_inspection["A"]["removed"].append({"resource_id": "R1", "reason": "test"})
     assert original.domain_inspection["A"]["removed"] == []
+
+
+def test_infeasible_requirement_is_removed_from_partial_playback_problem():
+    item = problem({"IMPOSSIBLE": [], "A": ["R1"], "B": ["R2"]})
+    reduced = _maximal_feasible_problem(item)
+    assert reduced is not None
+    assert set(reduced.variables) == {"A", "B"}
+    result = solve_backtracking(reduced)
+    assert result["solution_found"]
+    assert len(result["assignment"]) == 2
 
 
 def test_domain_generation_filters_every_unary_constraint(monkeypatch):
