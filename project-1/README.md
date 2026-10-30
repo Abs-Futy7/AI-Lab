@@ -69,7 +69,7 @@ The README distinguishes textbook properties from the behavior of the exact code
 - Layer controls for the route, expanded nodes, blocked roads, congestion, risk, coverage, and camera framing.
 - Side-by-side result table and expanded-node chart.
 - A separate six-map live simulation using one shared playback timeline.
-- Completed six-map cards consistently reframe the final route; failed searches reframe their explored-node region instead of remaining at full-network coverage.
+- After the shared playback completes, every six-map card uses the same source-to-destination bounds and zoom. Each algorithm keeps its own route overlay, but the final cameras remain directly comparable even when DFS takes a long detour.
 - Best-path analysis that favors minimum weighted cost and then search efficiency.
 - FastAPI validation and Swagger documentation.
 - Synthetic-graph tests independent of OpenStreetMap availability.

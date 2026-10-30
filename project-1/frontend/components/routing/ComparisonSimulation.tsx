@@ -118,9 +118,6 @@ export default function ComparisonSimulation({ request }: { request: ComparisonR
             </div>
           </section>
 
-          <BestPathAnalysis comparison={comparison} />
-          <ComparisonMetricCharts comparison={comparison} />
-
           <section className="algorithm-map-grid">
             {algorithms.map(({ key, label, color }) => {
               const result = comparison.results[key];
@@ -139,6 +136,8 @@ export default function ComparisonSimulation({ request }: { request: ComparisonR
             })}
           </section>
           <p className="comparison-footnote">The algorithms already finished on the backend (slowest: {slowestRuntime.toFixed(2)} ms). The longer shared timeline is an animation of their recorded node-expansion order, not search computation time.</p>
+          <BestPathAnalysis comparison={comparison} />
+          <ComparisonMetricCharts comparison={comparison} />
         </>
       )}
     </main>

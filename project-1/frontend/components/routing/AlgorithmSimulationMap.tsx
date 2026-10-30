@@ -61,6 +61,10 @@ export default function AlgorithmSimulationMap({
     () => graphCoverageFromMetadata(result.scenario_metadata),
     [result.scenario_metadata],
   );
+  const completionFrame = useMemo(() => [
+    { lat: source.lat, lng: source.lon },
+    { lat: destination.lat, lng: destination.lon },
+  ], [destination.lat, destination.lon, source.lat, source.lon]);
   const routeCount = Math.max(0, playbackStep - result.expanded_nodes.length);
   const visibleRoute = result.path.slice(0, routeCount);
   const currentNode = expandedCount > 0 && playbackStep <= result.expanded_nodes.length
@@ -80,7 +84,7 @@ export default function AlgorithmSimulationMap({
         <TileLayer attribution="OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <KeepMapSized />
         <FitExperiment result={result} source={source} destination={destination} graphCoverage={graphCoverage} />
-        <PlaybackCamera result={result} playbackStep={playbackStep} targetZoom={16} />
+        <PlaybackCamera result={result} playbackStep={playbackStep} targetZoom={16} completionFrame={completionFrame} />
         {graphCoverage && <GraphCoverageOverlay coverage={graphCoverage} color={color} />}
         {expanded.map((node, index) => (
           <CircleMarker key={`${node.lat}-${node.lng}-${index}`} center={[node.lat, node.lng]} radius={2.5} pathOptions={{ color, fillColor: color, fillOpacity: 0.48, weight: 1 }} />

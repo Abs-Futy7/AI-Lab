@@ -10,11 +10,13 @@ export function PlaybackCamera({
   playbackStep,
   enabled = true,
   targetZoom = 16,
+  completionFrame,
 }: {
   result: SearchResult;
   playbackStep: number;
   enabled?: boolean;
   targetZoom?: number;
+  completionFrame?: Array<{ lat: number; lng: number }>;
 }) {
   const map = useMap();
   const framedResult = useRef<SearchResult | null>(null);
@@ -35,7 +37,9 @@ export function PlaybackCamera({
     const totalSteps = expandedCount + result.path.length;
     if (playbackStep >= totalSteps) {
       if (completedResult.current !== result) {
-        const completedNodes = result.path.length > 1
+        const completedNodes = completionFrame && completionFrame.length > 1
+          ? completionFrame
+          : result.path.length > 1
           ? result.path
           : result.expanded_nodes;
         const frameCompletedSearch = () => {
@@ -44,11 +48,10 @@ export function PlaybackCamera({
             map.setView([completedNodes[0].lat, completedNodes[0].lng], targetZoom, { animate: false });
           } else if (completedNodes.length > 1) {
             map.fitBounds(completedNodes.map((point) => [point.lat, point.lng]), {
-              padding: [24, 24],
+              padding: [32, 32],
               maxZoom: targetZoom,
               animate: false,
             });
-            map.setZoom(Math.min(map.getZoom() + 1, targetZoom), { animate: false });
           }
         };
         window.requestAnimationFrame(frameCompletedSearch);
@@ -70,7 +73,7 @@ export function PlaybackCamera({
       });
     }
     framedResult.current = result;
-  }, [enabled, map, playbackStep, result, targetZoom]);
+  }, [completionFrame, enabled, map, playbackStep, result, targetZoom]);
 
   return null;
 }
