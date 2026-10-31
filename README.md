@@ -4,7 +4,11 @@ University Artificial Intelligence laboratory projects implemented as one deploy
 
 ## Project 1 — Emergency AI Search and Resource Allocation
 
-Full documentation: [project-1/README.md](./project-1/README.md)
+Documentation:
+
+- [Combined Lab 1 + Lab 2 README](./project-1/README.md)
+- [Standalone Lab 1 README](./project-1/LAB_1_README.md)
+- [Standalone Lab 2 CSP README](./project-1/LAB_2_README.md)
 
 ### Live application
 

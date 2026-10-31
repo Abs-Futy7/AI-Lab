@@ -1,5 +1,7 @@
 # AI Lab Frontend
 
+Project documentation: [combined README](../README.md) · [Lab 1 README](../LAB_1_README.md) · [Lab 2 CSP README](../LAB_2_README.md)
+
 The Next.js frontend contains two separate university AI laboratory demonstrations built with React, TypeScript, Raleway, Leaflet, and Recharts.
 
 ## Live application

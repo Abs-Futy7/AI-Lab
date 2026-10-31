@@ -1,4 +1,6 @@
-# Emergency Vehicle Routing with AI Search
+# AI Lab — Emergency Search and Constraint Satisfaction
+
+> **Separate laboratory guides:** [Lab 1 README](LAB_1_README.md) · [Lab 2 CSP README](LAB_2_README.md)
 
 > **Live demos:** [Project directory](https://ai-lab-project-1.vercel.app) · [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1) · [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2) · [Six-algorithm route simulation](https://ai-lab-project-1.vercel.app/simulation)
 
@@ -54,6 +56,8 @@ The project directly demonstrates these slide concepts:
 - the effect of graph size, branching, neighbor order, and heuristic quality.
 
 The README distinguishes textbook properties from the behavior of the exact code in this repository. For example, the slides describe an early generated-node goal test for BFS, while this implementation consistently records expansion first and tests the goal when the node is removed from the frontier. That implementation choice preserves minimum-hop optimality and makes the animation's definition of an expanded node uniform across algorithms.
+
+Lab 2 is aligned with **CSE 4101 Lecture Slide 5: Constraint Satisfaction Problems**, prepared by Mr. Palash Roy. Its complete slide-to-code mapping, implementation excerpts, viva notes, and limitations are in the [standalone Lab 2 README](LAB_2_README.md). The Lab 1 technical material in this combined README remains unchanged.
 
 ## Features
 
@@ -1121,6 +1125,8 @@ The graph libraries are infrastructure, not search solvers. The project does not
 ---
 
 # Lab 2 — Dhaka Emergency Response Resource Allocation System
+
+> For the complete Lecture Slide 5 analysis, source-code excerpts, algorithm pseudocode, complexity discussion, and likely viva questions, read [LAB_2_README.md](LAB_2_README.md).
 
 Lab 2 is a separate Constraint Satisfaction Problem (CSP) demonstration. It does not replace or merge with Lab 1. Lab 1 answers “which road route should one vehicle use?”; Lab 2 answers “which physical resources can be assigned to many simultaneous incidents without violating any hard constraint?” It calls the Lab-1 routing layer to evaluate reachability, distance, travel time, and route geometry for each candidate dispatch.
 
