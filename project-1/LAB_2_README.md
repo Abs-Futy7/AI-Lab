@@ -7,18 +7,21 @@ Lab 2 implements the material in **CSE 4101 Lecture Slide 5: Constraint Satisfac
 ## Contents
 
 1. [Problem and slide alignment](#problem-and-slide-alignment)
-2. [Formal CSP formulation](#formal-csp-formulation)
-3. [Variables and domains in code](#variables-and-domains-in-code)
-4. [Constraints and constraint graph](#constraints-and-constraint-graph)
-5. [AC-3 constraint propagation](#ac-3-constraint-propagation)
-6. [MRV, Degree, and LCV](#mrv-degree-and-lcv)
-7. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
-8. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
-9. [Min-Conflicts local search](#min-conflicts-local-search)
-10. [Exact project pipeline](#exact-project-pipeline)
-11. [Metrics and source layout](#metrics-and-source-layout)
-12. [API, tests, and viva](#api-tests-and-viva)
-13. [Assumptions and limitations](#assumptions-and-limitations)
+2. [CSP definitions and consistency methods](#csp-definitions-from-the-lecture)
+3. [Formal CSP formulation](#formal-csp-formulation)
+4. [Variables and domains in code](#variables-and-domains-in-code)
+5. [Constraints and constraint graph](#constraints-and-constraint-graph)
+6. [AC-3 constraint propagation](#ac-3-constraint-propagation)
+7. [MRV, Degree, and LCV](#mrv-degree-and-lcv)
+8. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
+9. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
+10. [Min-Conflicts local search](#min-conflicts-local-search)
+11. [Line-by-line code walkthrough](#line-by-line-implementation-walkthrough)
+12. [Worked emergency example](#worked-miniature-emergency-example)
+13. [Exact project pipeline](#exact-project-pipeline)
+14. [Metrics and source layout](#metrics-and-source-layout)
+15. [API, tests, solver comparison, and viva](#api-tests-and-viva)
+16. [Assumptions and limitations](#assumptions-and-limitations)
 
 ## Problem and slide alignment
 
@@ -44,6 +47,58 @@ Lab 2 reuses Lab 1's road layer only to determine candidate reachability, route 
 | Min-Conflicts | Seeded repair of a complete inconsistent assignment |
 
 The slide also discusses node, path, and general `k`-consistency. This project performs unary filtering and arc consistency. It does not claim a general path-consistency or `k`-consistency engine.
+
+## CSP definitions from the lecture
+
+### Assignment vocabulary
+
+- An **assignment** gives values to variables, for example `{INC-001_AMBULANCE_1: AMB023}`.
+- A **partial assignment** assigns only some variables.
+- A **complete assignment** assigns every variable.
+- A **consistent assignment** violates no constraint among its assigned variables.
+- A **solution** is both complete and consistent.
+
+The solver must not call a partial allocation a full solution, even if every assignment it contains is individually valid.
+
+### Constraint categories in this project
+
+| Category | General definition | Project example |
+|---|---|---|
+| Unary | Restricts one variable/value | `AMB023` must be available and reach the incident before its deadline |
+| Binary | Relates two variables | `INC-001_AMBULANCE_1 != INC-004_AMBULANCE_1` |
+| Higher-order | Relates three or more variables | Not directly used as a separate relation |
+| Global | Applies across an arbitrary set | One physical resource cannot be assigned twice (`Alldiff`) |
+| Soft | Preference that may be violated at a cost | Shorter travel time is an ordering preference, not a hard constraint |
+
+The project decomposes global `Alldiff` into binary `!=` constraints. This preserves valid solutions, though a specialized global propagator could infer more than binary AC-3.
+
+### Consistency methods: what each one means
+
+| Method | Definition | Project status |
+|---|---|---|
+| Node consistency | Every domain value satisfies all unary constraints on its variable | Implemented by domain filtering |
+| Arc consistency | Every value of `Xi` has some supporting value in neighboring `Xj` | Implemented with AC-3 |
+| Path consistency | Every consistent pair can be extended through a third variable | Not implemented |
+| `k`-consistency | Every consistent assignment to `k-1` variables extends to a kth | Not implemented |
+| Forward Checking | After `Xi=v`, remove incompatible values from direct unassigned neighbors | Implemented in Backtracking |
+| MAC | After each assignment, run AC-3 through the remaining network | Not implemented |
+
+### AC-1, AC-2, and AC-3
+
+- **AC-1** repeatedly scans every arc until a full pass makes no change. It is simple but performs many unnecessary checks.
+- **AC-2** organizes revisions to avoid some repeated work, but requires more bookkeeping.
+- **AC-3** keeps a queue of arcs. When `D(Xi)` changes, only arcs that may have lost support because of that change are added back.
+
+The application implements AC-3 because it is the standard balance of clarity and useful propagation described in Slide 5. Implementing AC-1 and AC-2 would add alternative scheduling strategies, not new solution correctness.
+
+### Forward Checking versus MAC
+
+Suppose `A = AMB001` is assigned:
+
+- Forward Checking removes `AMB001` from the direct neighbors of `A` and stops.
+- MAC removes it, then runs AC-3 so any newly reduced domains can affect their neighbors recursively.
+
+MAC is stronger but costs more per search node. The project honestly reports its actual combination: AC-3 once before search, then Forward Checking during standard Backtracking.
 
 ## Formal CSP formulation
 
@@ -337,6 +392,356 @@ for step in range(max_steps):
 
 Min-Conflicts is incomplete. Reaching `max_steps` means this run failed to find a solution; it does not prove unsatisfiability.
 
+## Line-by-line implementation walkthrough
+
+This section condenses the real functions without changing their control flow. Comments explain why each operation exists.
+
+### Node-consistency-style domain construction
+
+```python
+for variable_id, variable in variables.items():
+    incident = incident_by_id[variable.incident_id]
+
+    # Type compatibility is enforced first: an ambulance requirement never
+    # receives a fire-unit or rescue-team ID in its initial domain.
+    compatible = sorted(resources_by_type[variable.resource_type],
+                        key=lambda item: item.id)
+
+    kept = []                              # Final feasible D(variable).
+    values = {}                            # Metadata for each retained value.
+    removed = []                           # Evidence shown in Domain Inspector.
+
+    for resource in compatible:
+        if not resource.available:         # Unary availability constraint.
+            removed.append({"resource_id": resource.id,
+                            "reason": "resource unavailable"})
+            continue
+
+        if resource.capacity < variable.required_capacity:
+            removed.append({"resource_id": resource.id,
+                            "reason": "insufficient capacity"})
+            continue
+
+        # Vehicles of one center share a cached route to this incident.
+        cache_key = (resource.center_id, incident.id)
+        if cache_key not in route_cache:
+            route_cache[cache_key] = calculate_lab2_candidate_route(...)
+        route = route_cache[cache_key]
+
+        if not route["found"]:             # Unary reachability constraint.
+            removed.append({"resource_id": resource.id,
+                            "reason": "no accessible route"})
+            continue
+
+        if route["travel_time_minutes"] > incident.deadline_minutes:
+            removed.append({"resource_id": resource.id,
+                            "reason": "deadline exceeded"})
+            continue
+
+        estimated_cost = resource.dispatch_cost + route["distance_m"] / 1000 * 45
+        if estimated_cost > incident.budget:
+            removed.append({"resource_id": resource.id,
+                            "reason": "incident budget exceeded"})
+            continue
+
+        kept.append(resource.id)            # Value satisfies every unary rule.
+        values[resource.id] = CandidateValue(
+            resource_id=resource.id,
+            distance_m=route["distance_m"],
+            travel_time_minutes=route["travel_time_minutes"],
+            estimated_cost=estimated_cost,
+            route=route["route"],
+        )
+
+    domains[variable_id] = kept
+    candidates[variable_id] = values
+```
+
+Filtering before search reduces the theoretical Cartesian product. If variables have domain sizes `|D1|, |D2|, ...`, the unpruned assignment count is their product. Removing even a few values from many domains can eliminate a very large number of complete combinations.
+
+### AC-3 and `REVISE`
+
+```python
+def revise(problem, first, second):
+    revised = False
+    supported = []
+    second_domain = problem.domains[second]
+
+    for first_value in problem.domains[first]:
+        # Constraint: first_value != second_value.
+        if not second_domain:
+            has_support = False             # No y exists at all.
+        elif len(second_domain) == 1:
+            # If the only y equals x, x has no support; otherwise it does.
+            has_support = different_resources(
+                first_value, second_domain[0], problem.metrics
+            )
+        else:
+            # With at least two distinct IDs, at least one differs from x.
+            problem.metrics.constraint_checks += 1
+            has_support = True
+
+        if has_support:
+            supported.append(first_value)
+        else:
+            revised = True
+            # Record exactly why the inspector lost this candidate.
+            problem.domain_inspection[first]["removed"].append({
+                "resource_id": first_value,
+                "reason": f"AC-3: no value remains in {second} "
+                          "that satisfies no-double-allocation",
+            })
+
+    if revised:
+        problem.domains[first] = supported
+    return revised
+
+
+def enforce_arc_consistency(problem):
+    # Unary filtering may already have produced an empty domain.
+    if any(not values for values in problem.domains.values()):
+        finish_metrics(problem)
+        return False
+
+    # Every binary constraint contributes both directed arcs.
+    queue = deque(
+        (first, second)
+        for first in sorted(problem.variables)
+        for second in sorted(problem.neighbors[first])
+    )
+
+    while queue:
+        first, second = queue.popleft()
+        problem.metrics.arc_revisions += 1
+
+        if revise(problem, first, second):
+            if not problem.domains[first]:  # Domain wipeout proves failure.
+                finish_metrics(problem)
+                return False
+
+            # D(first) shrank. Other neighbors relying on first may now lose
+            # support, so reconsider neighbor -> first arcs.
+            for neighbor in sorted(problem.neighbors[first] - {second}):
+                queue.append((neighbor, first))
+
+    finish_metrics(problem)
+    return True
+```
+
+### MRV + severity + Degree
+
+```python
+def select_unassigned_variable(problem, assignment):
+    unassigned = [name for name in problem.variables
+                  if name not in assignment]
+    used = set(assignment.values())
+
+    def key(name):
+        # Count domain values not already consumed by the partial assignment.
+        legal_count = sum(value not in used
+                          for value in problem.domains[name])
+
+        # Dynamic Degree counts only constraints to variables still unassigned.
+        degree = sum(other not in assignment
+                     for other in problem.neighbors[name])
+
+        # min() chooses smallest legal_count. Negative fields turn larger
+        # severity and degree into earlier choices.
+        return (legal_count,
+                -problem.variables[name].severity,
+                -degree,
+                name)
+
+    return min(unassigned, key=key)
+```
+
+For example, if `A` has 2 legal values and degree 8 while `B` has 1 legal value and degree 2, MRV chooses `B`. Degree is consulted only after the MRV count (and project severity tie-break) is equal.
+
+### LCV
+
+```python
+def order_domain_values(problem, variable, assignment, exclude_used=True):
+    used = set(assignment.values())
+    values = [value for value in problem.domains[variable]
+              if not exclude_used or value not in used]
+
+    neighboring_occurrences = Counter()
+    for other in problem.neighbors[variable]:
+        if other not in assignment:
+            # Count how often each resource occurs in remaining neighbor domains.
+            neighboring_occurrences.update(problem.domains[other])
+
+    def eliminated(value):
+        impact = neighboring_occurrences[value]  # Choices removed if selected.
+        travel = problem.candidates[variable][value].travel_time_minutes
+        return (impact, travel, value)            # LCV, then stable tie-breaks.
+
+    return sorted(values, key=eliminated)
+```
+
+### Backtracking with reversible Forward Checking
+
+```python
+def search(assignment, depth):
+    metrics.nodes_visited += 1
+    metrics.max_depth = max(metrics.max_depth, depth)
+
+    if len(assignment) == len(problem.variables):
+        return dict(assignment)             # Complete + previously consistent.
+
+    variable = select_unassigned_variable(problem, assignment)
+
+    for value in order_domain_values(problem, variable, assignment):
+        metrics.assignments_attempted += 1
+
+        if assignment_conflicts(variable, value, assignment,
+                                problem.neighbors, metrics):
+            continue                        # Violates an assigned neighbor.
+
+        assignment[variable] = value
+        removed = []                        # Undo log for this decision only.
+        consistent = True
+
+        for neighbor in sorted(problem.neighbors[variable]):
+            if neighbor in assignment or value not in problem.domains[neighbor]:
+                continue
+
+            index = problem.domains[neighbor].index(value)
+            problem.domains[neighbor].pop(index)  # Forward Checking.
+            removed.append((neighbor, index))
+
+            if not problem.domains[neighbor]:     # Fail early on wipeout.
+                consistent = False
+                break
+
+        result = search(assignment, depth + 1) if consistent else None
+
+        # Restore in reverse order and at original indexes so another branch
+        # sees exactly the domain ordering that existed before this choice.
+        for neighbor, index in reversed(removed):
+            problem.domains[neighbor].insert(index, value)
+        del assignment[variable]
+
+        if result is not None:
+            return result
+
+    metrics.backtracks += 1
+    return None
+```
+
+### Conflict-Directed Backjumping
+
+```python
+def search(assignment, depth):
+    if len(assignment) == len(problem.variables):
+        return dict(assignment), None
+
+    variable = select_unassigned_variable(problem, assignment)
+    conflict_set = set()
+
+    # exclude_used=False is essential: used values reveal which earlier
+    # variables are responsible for conflicts.
+    for value in order_domain_values(problem, variable, assignment,
+                                     exclude_used=False):
+        direct = assignment_conflicts(variable, value, assignment,
+                                      problem.neighbors, metrics)
+        if direct:
+            conflict_set.update(direct)     # Accumulate actual culprits.
+            continue
+
+        assignment[variable] = value
+        result, failure = search(assignment, depth + 1)
+        del assignment[variable]
+
+        if result is not None:
+            return result, None
+
+        if variable not in failure.conflicts:
+            # Current variable did not cause the deeper dead end. Do not waste
+            # time trying its other values; carry the failure past this level.
+            failure.skipped.append(variable)
+            return None, failure
+
+        # Current variable was involved. Absorb the other responsible names.
+        conflict_set.update(failure.conflicts - {variable})
+
+    if not conflict_set:
+        # Chronological fallback keeps failure propagation well-defined when
+        # no direct conflict was observed.
+        assigned_neighbors = [name for name in assignment
+                              if name in problem.neighbors[variable]]
+        if assigned_neighbors:
+            conflict_set.add(assigned_neighbors[-1])
+
+    return None, Failure(conflict_set, variable)
+```
+
+### Min-Conflicts
+
+```python
+def solve_min_conflicts(problem, seed, max_steps=3000):
+    rng = random.Random(seed)               # Reproducible conflicted-var choice.
+
+    if any(not values for values in problem.domains.values()):
+        return failure                      # Cannot form a complete assignment.
+
+    # Start complete, even though duplicate resources may create conflicts.
+    assignment = {
+        variable: problem.domains[variable][index % len(problem.domains[variable])]
+        for index, variable in enumerate(sorted(problem.variables))
+    }
+
+    best_assignment = dict(assignment)      # Preserve best state before timeout.
+    best_conflicts = total_conflicts(assignment, problem.neighbors)
+
+    for step in range(max_steps):
+        conflicted = _conflicted_variables(assignment, problem.neighbors)
+        if not conflicted:
+            break                           # Complete assignment has zero conflicts.
+
+        variable = conflicted[rng.randrange(len(conflicted))]
+
+        def score(value):
+            conflict_count = sum(
+                assignment.get(other) == value
+                for other in problem.neighbors[variable]
+            )
+            travel = problem.candidates[variable][value].travel_time_minutes
+            return (conflict_count, travel, value)
+
+        chosen = min(problem.domains[variable], key=score)
+        assignment[variable] = chosen       # Repair one variable; never backtrack.
+
+        current = total_conflicts(assignment, problem.neighbors)
+        if current < best_conflicts:
+            best_conflicts = current
+            best_assignment = dict(assignment)
+
+    return assignment if total_conflicts(assignment, problem.neighbors) == 0 \
+        else best_assignment
+```
+
+## Worked miniature emergency example
+
+Assume three requirements:
+
+```text
+X1 = INC-001_AMBULANCE_1, D(X1) = {AMB01, AMB02}
+X2 = INC-002_AMBULANCE_1, D(X2) = {AMB01}
+X3 = INC-003_FIRE_UNIT_1, D(X3) = {FIRE01, FIRE02}
+```
+
+`X1` and `X2` are neighbors because their domains overlap; `X3` is independent.
+
+1. AC-3 examines `X1 -> X2`. `AMB01` in `D(X1)` has no different supporting value in singleton `D(X2)={AMB01}`, so it removes `AMB01` from `D(X1)`.
+2. Domains become `D(X1)={AMB02}`, `D(X2)={AMB01}`, and `D(X3)={FIRE01,FIRE02}`.
+3. MRV ties `X1` and `X2` at one value; severity, Degree, then ID settle the choice.
+4. Backtracking assigns the singleton ambulance values without conflict.
+5. LCV orders `X3`'s values. Because it has no unassigned neighbors, both have impact zero; travel time decides.
+6. The complete assignment is consistent because every requirement is assigned and the two ambulance variables use distinct IDs.
+
+This example shows why domain propagation is useful: it resolves the ambulance competition before recursive trial and error.
+
 ## Exact project pipeline
 
 ```text
@@ -443,6 +848,20 @@ Open `http://localhost:3000/lab2` and `http://localhost:8000/docs`.
 
 The tests cover AC-3 pruning/empty domains, MRV/severity/Degree, LCV, exact and partial Backtracking, uniqueness, actual CBJ skips, Min-Conflicts repair, clone isolation, every unary filter, feasible partial playback, API solving, fair comparison, and serverless frozen-state handling.
 
+### Solver comparison
+
+| Property | Backtracking + FC | Conflict-Directed Backjumping | Min-Conflicts |
+|---|---|---|---|
+| State style | Consistent partial assignment | Consistent partial assignment + conflict sets | Complete, possibly inconsistent assignment |
+| Variable choice | MRV, severity, Degree | MRV, severity, Degree | Seeded choice among conflicted variables |
+| Value choice | LCV | LCV, including used values for culprit discovery | Minimum conflicts, then travel time |
+| Failure recovery | Previous recursive level | Most recent relevant culprit | Repair another conflicted value |
+| Completeness | Yes for finite CSP without operational limits | Yes for finite CSP under its exhaustive recursion | No |
+| Main advantage | Clear and systematic | Avoids irrelevant chronological work | Often fast with small state |
+| Main risk | Exponential search | Conflict bookkeeping overhead | Local plateaus/cycles and step limit |
+
+Preprocessing is shared. AC-3 is not counted as a fourth allocation solver because it prunes domains; it does not generally produce a complete assignment by itself.
+
 ### Likely viva questions
 
 **What are `X`, `D`, and `C`?** `X` is incident requirement slots; `D(Xi)` is feasible physical resource IDs; `C` is unary feasibility plus binary uniqueness.
@@ -466,6 +885,38 @@ The tests cover AC-3 pruning/empty domains, MRV/severity/Degree, LCV, exact and 
 **Is total distance globally optimized?** No. This is a satisfaction problem. A true global objective would turn it into a constraint optimization problem.
 
 **Are these library algorithms?** No. The CSP logic lives in `backend/app/csp/`; graph libraries only support road-based domain construction.
+
+**What does “support” mean in arc consistency?** For value `x` in `D(Xi)`, support is at least one value `y` in neighboring `D(Xj)` for which the binary constraint is true. Here that means some `y != x`.
+
+**Does an empty domain always mean failure?** Yes for the full CSP: that variable has no legal value. The application may solve the remaining independent feasible variables for playback, but the complete status stays unsatisfied.
+
+**Why are both directions of an arc needed?** `Xi` being consistent with `Xj` does not automatically prove `Xj` is consistent with `Xi`, even when the relation itself is symmetric, because their domains can differ.
+
+**Can AC-3 detect every `Alldiff` shortage?** No. Binary inequalities may all have local support while a group collectively has too few distinct values. The resource-union check detects the obvious type-wise pigeonhole case, but it is not a full global `Alldiff` propagator.
+
+**Why is severity between MRV and Degree?** It is a project-specific emergency policy. MRV retains fail-first correctness-neutral ordering; when counts tie, handling the more severe incident first makes the trace operationally meaningful, then Degree chooses broader constraint influence.
+
+**Can heuristics change whether a valid solution exists?** No. MRV, Degree, and LCV change only the order of exploration. Hard constraints define the solution set.
+
+**Why restore domains during Backtracking?** Forward Checking mutates neighbor domains for one hypothetical decision. Without exact restoration, later branches would inherit removals that do not belong to them and could falsely fail.
+
+**Why does CBJ use `exclude_used=False`?** A used value conflicts with the variable that already owns it. Examining it reveals the responsible assigned variable and builds a meaningful conflict set; filtering it out too early would hide the culprit.
+
+**Can CBJ be slower than ordinary Backtracking?** Yes. On easy instances with no useful jump, conflict-set bookkeeping adds overhead. Its benefit appears when failures depend on older decisions and many intervening assignments are irrelevant.
+
+**Why is Min-Conflicts incomplete?** It follows local repair choices and can revisit plateaus or fail to enter the basin of a solution before `max_steps`, even when a solution exists.
+
+**What does the deterministic seed control?** Scenario generation and Min-Conflicts' conflicted-variable selection. The same request and seed make classroom comparisons reproducible.
+
+**Why clone the CSP for comparison?** AC-3 and Forward Checking mutate domains and metrics. Without deep-enough clones, the second solver would receive state pruned or measured by the first, making comparison invalid.
+
+**Why cache routes by center and incident?** Vehicles of the same center start at identical coordinates. Their center-to-incident road calculation is identical, so reusing it avoids redundant A* runs while keeping vehicle IDs distinct CSP values.
+
+**What is the difference between hard and soft constraints here?** Hard constraints can invalidate a candidate. Travel time also participates in hard deadline filtering, but among already feasible values the shorter time is merely an LCV tie-break preference.
+
+**Could MAC be added?** Yes. After assigning `Xi=v`, temporarily reduce `D(Xi)` to `{v}`, enqueue affected arcs, run AC-3, recurse if consistent, and restore all domain reductions on return. It would provide stronger inference at greater per-node cost.
+
+**Why not implement AC-1 and AC-2 too?** They enforce the same arc-consistency property using different revision schedules. AC-3 is the clearest standard choice for this project; adding the older schedules would mainly demonstrate performance differences.
 
 ## Assumptions and limitations
 
