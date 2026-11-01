@@ -1,7 +1,7 @@
 .comparison-simulation-shell {
   min-height: 100vh;
   padding: 0 18px 18px;
-  color: #102033;
+  color: var(--ink);
   background: var(--page-background);
   font-family: var(--font-raleway), Arial, Helvetica, sans-serif;
 }
