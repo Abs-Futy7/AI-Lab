@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 0 18px 18px;
   color: #102033;
-  background: #e9eff5;
+  background: var(--page-background);
   font-family: var(--font-raleway), Arial, Helvetica, sans-serif;
 }
 
