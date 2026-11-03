@@ -75,6 +75,7 @@ Lab 2 is aligned with **CSE 4101 Lecture Slide 5: Constraint Satisfaction Proble
 - A separate six-map live simulation using one shared playback timeline.
 - After the shared playback completes, every six-map card uses the same source-to-destination bounds and zoom. Each algorithm keeps its own route overlay, but the final cameras remain directly comparable even when DFS takes a long detour.
 - Best-path analysis that favors minimum weighted cost and then search efficiency.
+- A right-side Best Algorithm sheet after Compare All, with the winner, ranking evidence, reason, and an inspect-on-map action.
 - FastAPI validation and Swagger documentation.
 - Synthetic-graph tests independent of OpenStreetMap availability.
 - Offline fallback graph when Overpass or the GraphML cache is unavailable.

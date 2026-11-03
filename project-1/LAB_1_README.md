@@ -483,6 +483,8 @@ def weighted_heuristic(graph, node, goal, distance_weight):
 
 The `/lab1` dashboard supports individual experiments. The `/simulation` page runs all six algorithms on one frozen request and replays their expansion sequences with a synchronized timeline. At completion all maps use identical source-to-destination camera bounds while keeping algorithm-specific routes and explored nodes.
 
+After **Compare All**, the Lab 1 dashboard's right column shows a Best Algorithm sheet. It ranks successful routes by lowest weighted cost, then fewer expanded nodes, then lower runtime; explains the winning trade-off; shows the winner's distance, cost, expansions, and runtime; and can load that winning route onto the main map.
+
 ## API
 
 | Method | Endpoint | Purpose |
