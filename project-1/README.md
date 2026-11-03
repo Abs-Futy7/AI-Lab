@@ -1,6 +1,6 @@
 # AI Lab — Emergency Search and Constraint Satisfaction
 
-> **Full annotated study guides:** [Lab 1 algorithms, commented code, and viva Q&A](LAB_1_README.md) · [Lab 2 CSP methods, commented code, and viva Q&A](LAB_2_README.md)
+> **Full annotated study guides:** [Lab 1 algorithms, commented code, and Banglish viva Q&A](LAB_1_README.md) · [Lab 2 CSP methods, commented code, and viva Q&A](LAB_2_README.md)
 
 > **Live demos:** [Project directory](https://ai-lab-project-1.vercel.app) · [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1) · [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2) · [Six-algorithm route simulation](https://ai-lab-project-1.vercel.app/simulation)
 

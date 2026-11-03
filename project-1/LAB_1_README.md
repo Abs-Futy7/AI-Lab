@@ -18,6 +18,7 @@ This is the standalone guide for Lab 1. Its implementation and technical design 
 10. [Visualization and API](#visualization)
 11. [Run and verify](#run-and-verify)
 12. [Detailed viva Q&A](#detailed-viva-questions-and-answers)
+13. [Banglish viva preparation](#banglish-viva-preparation--সম্ভাব্য-sir-questions-and-answers)
 
 ## Problem
 
@@ -586,6 +587,300 @@ No. NetworkX stores the `MultiDiGraph`; OSMnx loads and locates road data. Front
 ### Which algorithm is “best”?
 
 There is no universal best. For weighted emergency routing, UCS and A* provide the relevant cost-optimal guarantee; A* usually searches more efficiently. BFS is a minimum-hop baseline, Greedy emphasizes low effort, and DFS/IDS demonstrate depth-first behavior.
+
+## Banglish viva preparation — সম্ভাব্য Sir questions and answers
+
+এই section-টি oral evaluation-এর জন্য। Answer-গুলো short form-এ শুরু হয়েছে, তারপর প্রয়োজন হলে বলার মতো technical detail দেওয়া আছে। মুখস্থ না করে flow-টা বুঝে বলাই better.
+
+### Project overview and graph
+
+#### Q1. তোমার Lab 1 project আসলে কী solve করে?
+
+**Answer:** Sir, project-টা Central Dhaka-এর real OpenStreetMap road topology-র উপর emergency vehicle-এর source থেকে destination route খুঁজে। আমি BFS, DFS, UCS, IDS, Greedy Best-First, এবং A* manually implement করেছি। একই graph, same scenario, same source-destination, আর same cost weights দিয়ে algorithms compare করি।
+
+#### Q2. এখানে state, action, goal, আর solution কী?
+
+**Answer:** একটি OSM road node হলো state। Current node থেকে কোনো unblocked outgoing road edge traverse করা হলো action। User-এর destination coordinate-এর nearest graph node হলো goal। Source থেকে goal পর্যন্ত ordered nodes এবং exact edge keys-এর sequence হলো solution route।
+
+#### Q3. Graph কোথা থেকে পেয়েছ? নিজে বানিয়েছ?
+
+**Answer:** Main graph OSMnx দিয়ে OpenStreetMap থেকে Central Dhaka-এর `drive` network হিসেবে load করা। Default center `(23.7330, 90.3950)`, radius `3000 m`। Downloaded graph GraphML cache-এ রাখা হয়। OSM/Overpass unavailable হলে শুধু graceful fallback হিসেবে 7×7 synthetic connected grid আছে। Search algorithms কিন্তু OSMnx বা NetworkX shortest-path call করে না—ওগুলো আমি manually লিখেছি।
+
+#### Q4. NetworkX তাহলে কী কাজ করে?
+
+**Answer:** NetworkX শুধু directed multigraph data structure store করে—nodes, directed edges, attributes, successors ইত্যাদি। Frontier, reached set, `g(n)`, `h(n)`, relaxation, goal test, parent map, path reconstruction—সব project code-এর manual implementation।
+
+#### Q5. কেন `MultiDiGraph` ব্যবহার করেছ?
+
+**Answer:** `DiGraph` দরকার কারণ one-way road আছে; `u→v` থাকলেই `v→u` থাকবে না। `Multi` দরকার কারণ একই দুই node-এর মধ্যে multiple parallel road edges থাকতে পারে। Project প্রতিটি neighbor-এর জন্য lowest-cost unblocked parallel edge deterministicভাবে select করে।
+
+#### Q6. User map-এ arbitrary point দিলে node কীভাবে পাও?
+
+**Answer:** Source এবং destination latitude/longitude-এর nearest OSM nodes বের করি। OSMnx nearest-node available থাকলে সেটা ব্যবহার করি; fallback graph-এর জন্য coordinate distance scan আছে। Search actual arbitrary pixels-এর উপর না, snapped graph nodes-এর মধ্যে চলে।
+
+### Experiment graph size
+
+#### Q7. Small, Medium, Full experiment graph বলতে কী বোঝায়?
+
+**Answer:** Small প্রায় `500` nodes, Medium প্রায় `2000` nodes, আর Full হলো loaded graph-এর সব available nodes। এগুলো আলাদা algorithm না; একই road graph-এর experiment scale, যাতে graph size বাড়লে expansion, runtime, এবং memory behavior দেখা যায়।
+
+#### Q8. Small graph কি randomly 500 nodes নিয়ে বানিয়েছ?
+
+**Answer:** না Sir. Random nodes নিলে source-destination disconnected হতে পারে। প্রথমে full graph-এ manual BFS দিয়ে source থেকে destination পর্যন্ত একটি directed corridor retain করি। তারপর corridor-এর successors এবং predecessors breadth-first expand করে target node count পর্যন্ত নিই। শেষে induced subgraph copy করি। তাই source-destination corridor preserve হয় এবং nearby network যুক্ত হয়।
+
+#### Q9. Small সবসময় exactly 500 nodes হয়?
+
+**Answer:** Approximately 500। Corridor নিজেই target-এর চেয়ে বড় হলে বা base graph ছোট হলে exact count different হতে পারে। Medium-ও একইভাবে approximately 2000। UI তাই “about 500” এবং “about 2,000” বলে।
+
+#### Q10. Graph size বাড়লে কোন algorithm বেশি affected হয়?
+
+**Answer:** Blind algorithms সাধারণত বেশি affected হয়। BFS-এর frontier এবং reached set দ্রুত বড় হয়; UCS cost order-এ অনেক nodes expand করতে পারে। Good heuristic থাকলে A* goal direction-এ focused থাকে। কিন্তু actual result graph structure, endpoints, scenario, এবং weights-এর উপর depend করে। DFS কখনো কম nodes-এ goal পায়, কিন্তু route quality খারাপ হতে পারে।
+
+### Traffic, road condition, risk, and scenarios
+
+#### Q11. Traffic data কি real/live traffic API থেকে পেয়েছ?
+
+**Answer:** না Sir. Road topology real OSM data, কিন্তু traffic, road condition, risk, এবং closures simulated teaching data। Project কোনো live traffic, Google Maps, police, weather, বা government API use করে না। README/UI-তে এটাকে explicitly simulation বলা হয়েছে।
+
+#### Q12. Traffic কীভাবে add করেছ?
+
+**Answer:** Scenario apply করার সময় প্রত্যেক road edge-এ deterministic pseudo-random traffic value বসাই। Normal baseline traffic `0.02–0.16` range। Medium Traffic scenario-তে প্রায় 38% edges-এর traffic `0.35–0.62`; Heavy Traffic-এ প্রায় 38% edges `0.72–1.0` হয়। Same seed আর same road হলে value repeat হয়।
+
+Relevant code idea:
+
+```python
+rng = random.Random(f"{scenario_seed}|{road_identity}|{key}")
+edge["traffic"] = rng.uniform(0.02, 0.16)   # normal baseline
+
+if scenario == medium_traffic and roll < 0.38:
+    edge["traffic"] = rng.uniform(0.35, 0.62)
+elif scenario == heavy_traffic and roll < 0.38:
+    edge["traffic"] = rng.uniform(0.72, 1.0)
+```
+
+#### Q13. Random হলে compare fair কীভাবে?
+
+**Answer:** সাধারণ global random call না করে per-road deterministic RNG use করেছি। Key হলো scenario seed, unordered road identity, এবং edge key। Compare request-এ scenario graph একবার generate হয়; তারপর all six algorithms exactly একই graph object, same edge values, endpoints, এবং weights পায়। তাই comparison controlled and reproducible।
+
+#### Q14. Seed কী? কেন দরকার?
+
+**Answer:** Seed pseudo-random generation-এর starting identity। Default `RANDOM_SEED=42`। Scenario type অনুযায়ী base seed-এর সঙ্গে enum index × `1009` যোগ হয়; তারপর road identity দিয়ে per-edge RNG হয়। একই seed + scenario দিলে একই simulated conditions পাওয়া যায়—demo এবং tests reproducible হয়।
+
+#### Q15. Normal scenario-তেও traffic আছে কেন?
+
+**Answer:** Normal মানে zero traffic না; low baseline operational variation। প্রতিটি edge-এ traffic `0.02–0.16`, condition `0.01–0.10`, risk `0.01–0.08` থাকে। Other scenarios selected edges-এ এই values significantly বাড়ায় বা edge block করে।
+
+#### Q16. Road scenarios কী কী এবং কী করে?
+
+**Answer:**
+
+- **Normal:** low baseline traffic, condition penalty, risk; no blocked edge.
+- **Medium traffic:** প্রায় 38% roads-এ traffic `0.35–0.62`.
+- **Heavy traffic:** প্রায় 38% roads-এ traffic `0.72–1.0`.
+- **Flood:** প্রায় 9% edges blocked; পরবর্তী roll range-এ poor condition `0.70–1.0`.
+- **High risk:** প্রায় 32% roads-এ risk `0.72–1.0`.
+- **Combined emergency:** প্রায় 5% blocked, 20% heavy traffic, 15% poor condition, 13% high risk—একটি mutually exclusive roll chain অনুযায়ী।
+
+Percentages deterministic sample rules; finite graph-এ final measured counts metadata-তে return হয়।
+
+#### Q17. Map-এ সব traffic road দেখাও?
+
+**Answer:** না, readability-এর জন্য heavy-traffic layer শুধু `traffic >= 0.70` roads orange overlay হিসেবে দেখায়। কিন্তু cost calculation প্রতিটি edge-এর actual traffic value use করে—even low/medium values যেগুলো overlay-তে আলাদা করে visible না।
+
+#### Q18. Road condition আর risk বলতে কী?
+
+**Answer:** এগুলো normalized simulated severity factors। `road_condition` বেশি মানে poor/damaged road penalty বেশি; `risk` বেশি মানে unsafe-zone penalty বেশি। Values `0–1` style range-এ থাকে এবং distance ও user weight-এর সাথে multiply হয়। এগুলো live physical measurements না।
+
+### Blocked roads
+
+#### Q19. রাস্তা blocked হলে কী হয়?
+
+**Answer:** Blocked road-কে huge cost দিয়ে discourage করি না; legal successor set থেকেই remove করি। `get_best_traversable_edge` blocked parallel edges skip করে। যদি `u→v`-এর সব parallel edges blocked হয়, `v` সেই direction-এ neighbor হিসেবেই পাওয়া যায় না। তাই কোনো algorithm blocked edge traverse করতে পারে না।
+
+```python
+for key, data in graph.get_edge_data(u, v).items():
+    if not is_blocked(data):
+        candidates.append((edge_cost(data, weights), key, data))
+```
+
+#### Q20. Blocked road থাকলে algorithm কী alternate route নেবে?
+
+**Answer:** Alternate connected path থাকলে search সেটি খুঁজতে পারে। Route longer বা costlier হতে পারে এবং expansion বাড়তে পারে। যদি closures source-goal connectivity পুরো break করে, frontier empty হবে এবং result `found=false`, reason `frontier_exhausted`। Expansion cap আগে hit করলে `max_expansions_reached`; সেটি “route নেই” prove করে না।
+
+#### Q21. দুই node-এর মধ্যে একটি parallel edge blocked, আরেকটি open হলে?
+
+**Answer:** Open edge এখনও traversable। Project সব non-blocked parallel candidates-এর cost compute করে এবং lowest-cost edge key select করে। সবগুলো blocked হলেই connection unavailable।
+
+#### Q22. `edge_cost()` blocked edge পেলে error কেন দেয়?
+
+**Answer:** Defensive programming। Normal flow blocked edge আগেই neighbor generation-এ বাদ দেয়। তারপরও ভুল করে cost function-এ blocked edge গেলে `ValueError` হয়, যাতে silently invalid route তৈরি না হয়।
+
+### Cost weights and route cost
+
+#### Q23. Cost weights বলতে কী বোঝায়?
+
+**Answer:** User route decision-এ distance, traffic, road condition, এবং safety risk-এর relative importance set করে। Default weights: distance `0.30`, traffic `0.40`, condition `0.20`, risk `0.10`। Pydantic validation নিশ্চিত করে weights nonnegative এবং sum approximately `1.0`।
+
+#### Q24. Exact cost formula কী?
+
+**Answer:** প্রতিটি edge-এর জন্য:
+
+```text
+edge_cost = distance_m × w_distance
+          + distance_m × traffic × w_traffic
+          + distance_m × road_condition × w_condition
+          + distance_m × risk × w_risk
+```
+
+Path cost হলো selected route-এর সব edge cost-এর sum। Distance multiplication-এর কারণে longer road-এ একই severity থাকলেও penalty বেশি হয়।
+
+#### Q25. Traffic weight বাড়ালে কী হবে?
+
+**Answer:** Congested road-এর cost contribution বাড়বে। UCS এবং A* তখন সম্ভব হলে longer physical distance হলেও low-traffic alternative নিতে পারে। Greedy/BFS/DFS/IDS expansion priority full cost দিয়ে চলে না, তাই route selection guarantee weighted objective অনুযায়ী নয়; result বের হওয়ার পর route cost অবশ্য একই formula-তে report হয়।
+
+#### Q26. Traffic weight zero করলে কী হয়?
+
+**Answer:** Traffic attribute graph-এ থাকবে এবং overlay-তেও দেখা যেতে পারে, কিন্তু weighted cost-এ traffic contribution zero হবে। UCS/A* traffic ignore করবে। Other nonzero distance/condition/risk components route cost ঠিক করবে।
+
+#### Q27. Distance আর total cost-এর difference কী?
+
+**Answer:** Distance শুধু physical meters। Total cost হলো weighted objective—distance plus congestion, condition, and risk penalties। Shortest-distance route necessarily lowest-cost route না। তাই UI দুটো আলাদা metric দেখায়।
+
+#### Q28. Weight sum 1 কেন রাখছ?
+
+**Answer:** যাতে values relative preferences হিসেবে সহজে interpret করা যায় এবং experiments comparable থাকে। Mathematical correctness-এর জন্য sum 1 mandatory না, কারণ common scaling route order একই রাখতে পারে; কিন্তু UI semantics এবং validation clarity-এর জন্য normalized weights use করেছি।
+
+### Algorithm implementation and differences
+
+#### Q29. BFS কীভাবে কাজ করে?
+
+**Answer:** BFS FIFO `deque` use করে। Start enqueue, pop-left করে expand, unvisited neighbors queue-এর back-এ add। Level-by-level যায়, তাই unweighted step count-এ minimum-hop route দেয়। Weighted traffic-aware minimum cost guarantee করে না।
+
+#### Q30. DFS কীভাবে কাজ করে?
+
+**Answer:** DFS LIFO stack use করে। Last pushed node first pop হয়, তাই এক branch deep যায়। Reached set cycle/duplicate আটকায়। First goal route return করে; minimum hop বা minimum cost guarantee নেই। Neighbor order বদলালে route অনেক বদলাতে পারে।
+
+#### Q31. UCS কীভাবে কাজ করে?
+
+**Answer:** UCS min-heap-এ accumulated `g(n)` রাখে। Lowest path cost node pop করে। Neighbor-এর নতুন `tentative_g` previous best-এর চেয়ে কম হলে relax করে—`g_score`, parent update, new heap entry push। Nonnegative costs-এ goal pop হওয়ার সময় route cost-optimal।
+
+#### Q32. IDS কীভাবে কাজ করে?
+
+**Answer:** IDS depth limit `0,1,2,...` দিয়ে repeated depth-limited DFS চালায়। Shallow solution BFS-এর মতো খুঁজে, কিন্তু depth-first traversal ব্যবহার করে। Previous levels repeat হয়, এবং project সেই repeated expansions count করে। `max_depth=40`; এর পরে goal না পেলে `ids_max_depth_reached`।
+
+#### Q33. Greedy Best-First কীভাবে কাজ করে?
+
+**Answer:** Greedy শুধু `h(n)`—goal পর্যন্ত estimated straight-line weighted distance—দিয়ে heap order করে। Already travelled `g(n)` ignore করে। তাই অনেক সময় খুব কম nodes expand করে, কিন্তু expensive/blocked-layout detour বা nonoptimal route নিতে পারে।
+
+#### Q34. A* কীভাবে কাজ করে?
+
+**Answer:** A* priority `f(n)=g(n)+h(n)`। `g` actual accumulated weighted cost, `h` optimistic remaining distance cost। Cheaper path পেলে parent এবং `g_score` update হয়। Admissible/consistent heuristic ও nonnegative costs থাকায় popped goal weighted-cost optimal।
+
+#### Q35. Heuristic exact কী?
+
+**Answer:** `h(n) = distance_weight × Haversine straight-line distance(n, goal)`। Traffic, condition, risk heuristic-এ add করি না, কারণ future penalty safely জানা নেই। Straight-line distance road distance-এর lower bound এবং other penalties nonnegative, তাই overestimate করে না।
+
+#### Q36. A* heuristic admissible কেন?
+
+**Answer:** Actual road path direct geographic line-এর চেয়ে ছোট হতে পারে না। Actual weighted edge cost-এ অন্তত `distance × w_distance` আছে, এবং বাকি penalties nonnegative। তাই straight-line distance component true remaining cost-এর upper না, lower bound।
+
+#### Q37. Distance weight zero হলে A* কী হয়?
+
+**Answer:** `h(n)=0`, তাই `f(n)=g(n)`। তখন A* behavior UCS-এর মতো হয়। Correctness থাকে; heuristic guidance থাকে না।
+
+#### Q38. UCS/A*-এ stale heap entry কী?
+
+**Answer:** Python `heapq`-তে decrease-key নেই। কোনো node-এর cheaper route পেলে old expensive entry delete না করে new entry push করি। Old one পরে pop হলে stored `g` current `g_score`-এর সাথে না মিললে skip করি। এটিই stale-entry detection।
+
+#### Q39. Goal generate হওয়ার সঙ্গে সঙ্গে UCS/A* stop করো না কেন?
+
+**Answer:** Generated goal route-এর চেয়ে cheaper route frontier-এ থাকতে পারে। Minimum priority হিসেবে goal pop হলে only তখন optimality establish হয়। তাই goal test pop/expansion-এর সময়।
+
+#### Q40. Reached set কখন add করো এবং কেন?
+
+**Answer:** BFS/DFS/Greedy-তে neighbor frontier-এ insert করার সময় reached add করি, যাতে multiple parents same node duplicate enqueue না করে। UCS/A*-এ Boolean reached যথেষ্ট না; cheaper later path allow করতে `g_score` use করি।
+
+#### Q41. Expanded node মানে কী?
+
+**Answer:** Frontier-এ add হওয়া generated; frontier থেকে remove করে process/goal-test/successor generation করা expanded। UI animation backend-এর exact expansion order replay করে। Route nodes এবং expanded nodes এক জিনিস না।
+
+### Which algorithm is better?
+
+#### Q42. কোন algorithm best?
+
+**Answer:** “Best” objective-এর উপর depend করে। Weighted emergency route quality চাইলে A* সাধারণত best practical choice—UCS-এর মতো optimal, কিন্তু heuristic-এর কারণে often fewer nodes expand করে। Guarantee-only baseline হলে UCS। Fewest road segments চাইলে BFS। Very fast-looking but nonoptimal search হলে Greedy। DFS/IDS behavior ও trade-off demonstrate করে, but weighted routing-এর first choice না।
+
+#### Q43. A* কি সবসময় UCS-এর চেয়ে runtime কম?
+
+**Answer:** Guarantee না। A* heuristic computation এবং heap overhead আছে। Small/easy graph-এ UCS equal বা faster হতে পারে। Good heuristic usually expansion কমায়, কিন্তু measured runtime machine, graph, endpoint, এবং tie pattern-এর উপর depend করে।
+
+#### Q44. Greedy কম nodes expand করলে Greedy-ই কি best?
+
+**Answer:** না। Low search effort আর low route cost different objectives। Greedy 20 nodes expand করে expensive route দিতে পারে; A* 100 nodes expand করে optimal cost route দিতে পারে। Emergency routing-এর defined objective weighted cost হলে route quality first।
+
+#### Q45. BFS আর UCS-এর difference কী?
+
+**Answer:** BFS queue order/edge depth দেখে; every edge conceptually equal step। UCS accumulated weighted cost দেখে। BFS minimum edges দেয়, UCS minimum weighted cost দেয়। All edge costs equal হলে তাদের chosen solution equivalent হতে পারে।
+
+#### Q46. Greedy আর A*-এর difference কী?
+
+**Answer:** Greedy `h` only; A* `g+h`। Greedy destination-এর দিকে aggressively যায় কিন্তু past expense ignore করে। A* past cost ও future estimate balance করে, তাই admissible heuristic-এ optimality পায়।
+
+#### Q47. DFS আর IDS-এর difference কী?
+
+**Answer:** DFS একবার deep search করে এবং first goal নেয়। IDS repeated depth-limited DFS করে, তাই shallowest depth systematically খুঁজে। IDS repeated work বেশি করে কিন্তু shallow-solution completeness better; DFS neighbor order-এর উপর বেশি arbitrary।
+
+#### Q48. UCS আর A*-এর difference কী?
+
+**Answer:** UCS priority `g`; A* priority `g+h`। Both weighted-cost optimal under assumptions। A* goal direction সম্পর্কে admissible knowledge use করে; UCS blindভাবে cheapest accumulated frontier expand করে। `h=0` হলে same principle।
+
+### Comparison, route choice, and metrics
+
+#### Q49. Compare All fair কীভাবে নিশ্চিত করেছ?
+
+**Answer:** `prepare_run()` একবার graph scale, endpoints, এবং deterministic scenario apply করে। তারপর loop-এ all six algorithms same graph এবং same `CostWeights` পায়। Scenario প্রতি algorithm-এর জন্য regenerate হয় না। Algorithms graph mutate করে না।
+
+#### Q50. UI “Best Path” কীভাবে select করে?
+
+**Answer:** Successful results-এর মধ্যে lowest `total_cost` first। Cost difference `0.01`-এর মধ্যে tie হলে fewer expanded nodes; still tie হলে lower measured runtime। তাই recommendation শুধু fastest algorithm না—route cost primary objective।
+
+#### Q51. Runtime কী measure করে?
+
+**Answer:** Backend algorithm function শুরু থেকে result construction পর্যন্ত `perf_counter()` elapsed milliseconds। Network request time, React render, Leaflet drawing, এবং deliberately slowed animation runtime-এর অংশ না।
+
+#### Q52. Expanded count বেশি মানে route খারাপ?
+
+**Answer:** না। Expanded count search effort measure করে; path cost route quality measure করে। UCS optimal route পেতে Greedy-এর চেয়ে বেশি expand করতে পারে। দুটো metric আলাদা করে interpret করতে হবে।
+
+#### Q53. Same route হলেও runtime/expanded different কেন?
+
+**Answer:** Algorithms different frontier order-এ alternative nodes explore করে, তারপর same parent chain-এ goal পেতে পারে। Final path same হওয়া মানে search process same না। Data structure overhead-ও runtime বদলায়।
+
+#### Q54. Animation অনেক সময় নেয়, algorithm কি আসলেই এত slow?
+
+**Answer:** না। Animation recorded expansion trace intentionally slowed করে human inspection-এর জন্য। Real backend runtime milliseconds-এ metrics panel-এ আছে। Thousands of expansions visually replay করলে animation long হয়।
+
+#### Q55. Route map-এ blue line কী?
+
+**Answer:** Algorithm parent information থেকে reconstructed final solution path। Expanded dots হলো explored nodes। Orange heavy traffic, red dashed blocked road, risk layer আলাদা scenario evidence। Final route এবং exploration trace separate layers।
+
+#### Q56. `max_expansions=50000` কেন?
+
+**Answer:** Large or unfavorable searches browser/API responsive রাখার operational safety cap। Cap hit করলে `max_expansions_reached`; এটি mathematical “no solution” না। Full unrestricted theoretical completeness-এর উপর practical limit impose করে—README-তে এই distinction আছে।
+
+#### Q57. Route পাওয়া না গেলে possible reasons কী?
+
+**Answer:** Flood/combined closures connectivity break করতে পারে; selected experiment subgraph-এ reachable direction নাও থাকতে পারে; expansion cap hit হতে পারে; IDS depth cap hit হতে পারে। `terminated_reason` দেখে exact reason বলতে হবে।
+
+#### Q58. Test কী করেছ?
+
+**Answer:** Synthetic graph tests দিয়ে BFS minimum-hop, DFS valid path, UCS/A* minimum cost, IDS depth behavior, Greedy ordering, blocked-edge rejection, cost-component sum, heuristic zero-at-goal, এবং deterministic scenarios verify করা হয়েছে। API/graph coverage tests-ও আছে। Synthetic tests OSM network availability-এর উপর depend করে না।
+
+### Strong closing answer
+
+#### Q59. এক মিনিটে project defend করো।
+
+**Answer:** Sir, আমি Central Dhaka-এর directed OSM driving graph use করে sixটা search algorithm manually implement করেছি। Real topology-এর উপর deterministic simulated traffic, road condition, risk, এবং closures edge attributes হিসেবে apply করি। Blocked edge legal successor থেকেই বাদ যায়। Weighted cost distance, traffic, condition, risk combine করে। BFS/DFS/IDS structural baselines, UCS weighted-cost optimum, Greedy heuristic-only fast baseline, আর A* actual cost plus admissible Haversine heuristic use করে optimal route efficiently খোঁজে। Fair comparison-এর জন্য all algorithms same frozen graph, scenario, endpoints, এবং weights পায়; backend expansion trace UI শুধু replay করে।
 
 ## Quick viva points
 
