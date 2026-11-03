@@ -11,7 +11,6 @@ import { ComparisonTable } from "./ComparisonTable";
 import { ControlPanel } from "./ControlPanel";
 import { CostBreakdown } from "./CostBreakdown";
 import { ExpandedNodesChart } from "./ExpandedNodesChart";
-import { HeuristicCard } from "./HeuristicCard";
 import { MetricsPanel } from "./MetricsPanel";
 import { SimulationControls } from "./SimulationControls";
 import { compareRoutes, findRoute, readableApiError } from "@/lib/api";
@@ -145,7 +144,7 @@ export default function RoutingDashboard() {
           <SimulationControls available={Boolean(result)} playing={playing} step={playbackStep} expandedCount={expandedCount} pathCount={pathCount} batchSize={playbackBatch} onPlaying={setPlaying} onStep={() => setPlaybackStep((current) => Math.min(playbackTotal, current + 1))} onReset={() => { setPlaybackStep(0); setPlaying(true); }} onBatchSize={setPlaybackBatch} />
           <RouteMap source={source} destination={destination} result={result} layers={layers} pickMode={pickMode} playbackStep={playbackStep} onMapClick={mapClicked} />
         </section>
-        <aside className="intel-column">{comparison && <BestAlgorithmSheet comparison={comparison} activeAlgorithm={algorithm} onInspect={changeAlgorithm} />}<MetricsPanel result={result} /><CostBreakdown result={result} /><HeuristicCard result={result} algorithm={algorithm} /></aside>
+        <aside className="intel-column">{comparison && <BestAlgorithmSheet comparison={comparison} activeAlgorithm={algorithm} onInspect={changeAlgorithm} />}<MetricsPanel result={result} /><CostBreakdown result={result} /></aside>
       </div>
       <div className="analysis-grid"><ComparisonTable comparison={comparison} /><ExpandedNodesChart comparison={comparison} /></div>
       <AssumptionsCard />

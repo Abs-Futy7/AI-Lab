@@ -84,7 +84,7 @@ export default function AlgorithmSimulationMap({
         <TileLayer attribution="OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <KeepMapSized />
         <FitExperiment result={result} source={source} destination={destination} graphCoverage={graphCoverage} />
-        <PlaybackCamera result={result} playbackStep={playbackStep} targetZoom={16} completionFrame={completionFrame} />
+        <PlaybackCamera result={result} playbackStep={playbackStep} targetZoom={15} completionFrame={completionFrame} />
         {graphCoverage && <GraphCoverageOverlay coverage={graphCoverage} color={color} />}
         {expanded.map((node, index) => (
           <CircleMarker key={`${node.lat}-${node.lng}-${index}`} center={[node.lat, node.lng]} radius={2.5} pathOptions={{ color, fillColor: color, fillOpacity: 0.48, weight: 1 }} />
@@ -95,11 +95,15 @@ export default function AlgorithmSimulationMap({
           </CircleMarker>
         )}
         {visibleRoute.length > 1 && (
-          <Polyline positions={visibleRoute.map((node) => [node.lat, node.lng])} pathOptions={{ color, opacity: 0.95, weight: 5 }} />
+          <>
+            <Polyline positions={visibleRoute.map((node) => [node.lat, node.lng])} pathOptions={{ color: "#ffffff", opacity: 0.96, weight: 8 }} />
+            <Polyline positions={visibleRoute.map((node) => [node.lat, node.lng])} pathOptions={{ color: "#0f172a", opacity: 1, weight: 5 }} />
+          </>
         )}
         <CircleMarker center={[source.lat, source.lon]} radius={6} pathOptions={{ color: "#fff", fillColor: "#16a34a", fillOpacity: 1, weight: 2 }}><Tooltip>Source</Tooltip></CircleMarker>
         <CircleMarker center={[destination.lat, destination.lon]} radius={6} pathOptions={{ color: "#fff", fillColor: "#dc2626", fillOpacity: 1, weight: 2 }}><Tooltip>Destination</Tooltip></CircleMarker>
       </MapContainer>
+      {visibleRoute.length > 1 && <div className="final-route-caption"><i /> Final path</div>}
       {graphCoverage && <div className="graph-coverage-caption">Radius coverage · {graphCoverageLabel(graphCoverage)}</div>}
     </div>
   );

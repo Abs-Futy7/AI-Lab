@@ -20,12 +20,10 @@ export function PlaybackCamera({
 }) {
   const map = useMap();
   const framedResult = useRef<SearchResult | null>(null);
-  const completedResult = useRef<SearchResult | null>(null);
 
   useEffect(() => {
     if (playbackStep <= 0) {
       framedResult.current = null;
-      completedResult.current = null;
       return;
     }
     if (!enabled) {
@@ -36,28 +34,34 @@ export function PlaybackCamera({
     const expandedCount = result.expanded_nodes.length;
     const totalSteps = expandedCount + result.path.length;
     if (playbackStep >= totalSteps) {
-      if (completedResult.current !== result) {
-        const completedNodes = completionFrame && completionFrame.length > 1
-          ? completionFrame
-          : result.path.length > 1
-          ? result.path
-          : result.expanded_nodes;
-        const frameCompletedSearch = () => {
-          map.invalidateSize({ pan: false });
-          if (completedNodes.length === 1) {
-            map.setView([completedNodes[0].lat, completedNodes[0].lng], targetZoom, { animate: false });
-          } else if (completedNodes.length > 1) {
-            map.fitBounds(completedNodes.map((point) => [point.lat, point.lng]), {
-              padding: [32, 32],
-              maxZoom: targetZoom,
-              animate: false,
-            });
-          }
-        };
-        window.requestAnimationFrame(frameCompletedSearch);
-        window.setTimeout(frameCompletedSearch, 180);
-        completedResult.current = result;
-      }
+      const completedNodes = completionFrame && completionFrame.length > 1
+        ? completionFrame
+        : result.path.length > 1
+        ? result.path
+        : result.expanded_nodes;
+      const frameCompletedSearch = () => {
+        map.invalidateSize({ pan: false });
+        if (completionFrame && completionFrame.length > 1) {
+          const center = completionFrame.reduce(
+            (total, point) => ({ lat: total.lat + point.lat, lng: total.lng + point.lng }),
+            { lat: 0, lng: 0 },
+          );
+          map.setView(
+            [center.lat / completionFrame.length, center.lng / completionFrame.length],
+            targetZoom,
+            { animate: false },
+          );
+        } else if (completedNodes.length === 1) {
+          map.setView([completedNodes[0].lat, completedNodes[0].lng], targetZoom, { animate: false });
+        } else if (completedNodes.length > 1) {
+          map.fitBounds(completedNodes.map((point) => [point.lat, point.lng]), {
+            padding: [32, 32],
+            maxZoom: targetZoom,
+            animate: false,
+          });
+        }
+      };
+      window.requestAnimationFrame(frameCompletedSearch);
       return;
     }
 
