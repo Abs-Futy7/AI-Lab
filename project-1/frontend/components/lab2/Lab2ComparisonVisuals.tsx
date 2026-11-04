@@ -53,6 +53,19 @@ export default function Lab2ComparisonVisuals({ comparison }: { comparison: Reco
         : null,
     };
   });
+  const preprocessingStopped = calculated.every((item) =>
+    item.result.requirements_allocated === 0
+    && item.effort === 0
+    && item.result.metrics.runtime_ms === 0
+  );
+  if (preprocessingStopped) {
+    const reason = calculated.find((item) => item.result.failure_reason)?.result.failure_reason;
+    return <section className="comparison-preprocessing-stop" role="status">
+      <strong>The solvers did not enter their search loops</strong>
+      <p>{reason ?? "Constraint preprocessing found no feasible requirement-resource assignment."}</p>
+      <span>Generate a less constrained scenario or increase resource availability, then compare again. Zero runtime and zero search nodes are preprocessing results—not solver performance.</span>
+    </section>;
+  }
   const recommended = [...calculated].sort((a, b) =>
     Number(b.result.solution_found) - Number(a.result.solution_found)
     || b.allocationRate - a.allocationRate

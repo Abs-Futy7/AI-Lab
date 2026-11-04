@@ -144,13 +144,62 @@ def _maximal_feasible_problem(problem: CSPProblem) -> CSPProblem | None:
             ),
         )
         if enforce_arc_consistency(reduced):
-            return reduced
+            matchable = _maximum_matchable_variables(reduced)
+            if matchable == active:
+                return reduced
+            active = matchable
+            domains.update(reduced.domains)
+            continue
         domains.update(reduced.domains)
         next_active = {name for name in active if reduced.domains.get(name)}
         if next_active == active:
             break
         active = next_active
     return None
+
+
+def _maximum_matchable_variables(problem: CSPProblem) -> set[str]:
+    """Return a deterministic maximum-cardinality all-different subset.
+
+    Binary AC-3 cannot detect a Hall/pigeonhole shortage (for example, ten
+    ambulance requirements sharing nine ambulances). A small augmenting-path
+    matching pass identifies the largest set that can receive distinct
+    resources. Higher-severity, smaller-domain requirements are considered
+    first so partial emergency dispatch remains operationally meaningful.
+    """
+    resource_owner: dict[str, str] = {}
+    variable_resource: dict[str, str] = {}
+
+    def augment(variable: str, seen: set[str]) -> bool:
+        ordered = sorted(
+            problem.domains[variable],
+            key=lambda resource: (
+                problem.candidates[variable][resource].travel_time_minutes,
+                resource,
+            ),
+        )
+        for resource in ordered:
+            if resource in seen:
+                continue
+            seen.add(resource)
+            owner = resource_owner.get(resource)
+            if owner is None or augment(owner, seen):
+                resource_owner[resource] = variable
+                variable_resource[variable] = resource
+                return True
+        return False
+
+    ordered_variables = sorted(
+        problem.variables,
+        key=lambda name: (
+            -problem.variables[name].severity,
+            len(problem.domains[name]),
+            name,
+        ),
+    )
+    for variable in ordered_variables:
+        augment(variable, set())
+    return set(variable_resource)
 
 
 def _solve_problem(
@@ -166,7 +215,7 @@ def _solve_problem(
             problem, algorithm, seed, debug, local_search_max_steps
         )
 
-    if not consistent:
+    if not consistent or not has_enough_distinct_resources(problem):
         reduced = _maximal_feasible_problem(problem)
         if reduced is not None and reduced.variables:
             raw = _run_selected_solver(
@@ -177,9 +226,10 @@ def _solve_problem(
             problem.metrics = reduced.metrics
             raw["solution_found"] = False
             raw["failure_reason"] = (
-                "Some requirements have no feasible resource after road, deadline, "
-                "capacity, budget, or AC-3 filtering. Feasible requirements were "
-                "allocated and are available for playback."
+                "Some requirements cannot receive a distinct feasible resource after "
+                "road, deadline, capacity, budget, AC-3, or global all-different "
+                "filtering. The largest matchable subset was solved and is available "
+                "for playback."
             )
             return raw
         return {
@@ -193,7 +243,7 @@ def _solve_problem(
         "solution_found": False,
         "assignment": {},
         "trace": [],
-        "failure_reason": "Resource shortage: a resource type has fewer distinct feasible resources than required variables.",
+        "failure_reason": "No requirement has a distinct feasible resource after preprocessing.",
     }
 
 

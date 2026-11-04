@@ -824,6 +824,12 @@ The recommendation is a transparent UI ranking for the current scenario, not a m
 
 If `/lab2/comparison` is opened directly without a scenario in the current browser session, it does not invent data. It shows a return action asking the user to generate a scenario first. This protects the same-scenario comparison claim.
 
+### Resource-shortage comparison behavior
+
+AC-3 on pairwise `resourceA != resourceB` constraints cannot by itself detect every global pigeonhole shortage. For example, ten ambulance requirements may each have a nonempty domain while their combined domains contain only nine distinct ambulances. Before running the selected solver, the backend therefore performs a deterministic maximum-cardinality bipartite matching check. When the complete problem is impossible, it retains the largest matchable requirement subset—prioritizing higher-severity and smaller-domain requirements—and runs Backtracking, CBJ, and Min-Conflicts on that shared subset. The comparison consequently contains real search/repair effort and playable partial allocations instead of misleading zero-runtime results.
+
+If preprocessing finds no matchable requirement at all, the visual dashboard suppresses winner charts and clearly reports that the solvers never entered their search loops. A zero preprocessing result is not presented as evidence that one algorithm is faster or better.
+
 ```text
 backend/app/
 |-- emergency/

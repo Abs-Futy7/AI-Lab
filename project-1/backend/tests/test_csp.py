@@ -15,7 +15,8 @@ from app.emergency.models import (
     ResourceType,
     ScenarioGenerateRequest,
 )
-from app.services.lab2_service import _maximal_feasible_problem
+from app.services.lab2_service import _maximal_feasible_problem, _solve_problem
+from app.emergency.models import CSPAlgorithm
 
 
 def candidate(resource: str, travel: float = 5.0) -> CandidateValue:
@@ -135,6 +136,20 @@ def test_infeasible_requirement_is_removed_from_partial_playback_problem():
     result = solve_backtracking(reduced)
     assert result["solution_found"]
     assert len(result["assignment"]) == 2
+
+
+def test_resource_shortage_solves_largest_distinct_subset():
+    item = problem({
+        "HIGH": ["R1", "R2"],
+        "MEDIUM": ["R1", "R2"],
+        "LOW": ["R1", "R2"],
+    }, {"HIGH": 5, "MEDIUM": 3, "LOW": 1})
+    raw = _solve_problem(item, CSPAlgorithm.backtracking, 42, True, 100)
+    assert not raw["solution_found"]
+    assert len(raw["assignment"]) == 2
+    assert len(set(raw["assignment"].values())) == 2
+    assert item.metrics.nodes_visited > 0
+    assert "largest matchable subset" in raw["failure_reason"]
 
 
 def test_domain_generation_filters_every_unary_constraint(monkeypatch):
