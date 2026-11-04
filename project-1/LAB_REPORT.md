@@ -35,15 +35,17 @@ The default weights are `0.30`, `0.40`, `0.20`, and `0.10`. Distance is multipli
 Greedy Best-First Search and A* use:
 
 ```text
-h(n) = w_distance × straight_line_distance(n, goal)
+road_lb(n,G) = max_L(0, d(L,G)-d(L,n), d(n,L)-d(G,L))
+minimum_unit_cost = min_unblocked_edge(cost(edge) / length(edge))
+h(n) = minimum_unit_cost × road_lb(n,G)
 ```
 
-Straight-line distance is calculated using the Haversine formula. This is aligned with the real cost because distance is one component of that cost. It is admissible for A*: actual road distance cannot be less than straight-line distance, and traffic, condition, and risk add only nonnegative penalties. Thus `h(n)` cannot overestimate the remaining weighted route cost. If `w_distance = 0`, the heuristic becomes zero and A* behaves like UCS.
+The revised heuristic is an ALT directed-landmark lower bound. West, east, south, and north boundary landmarks are preprocessed with manual road-length Dijkstra passes. Directed triangle inequalities lower-bound remaining road distance, and the minimum legal weighted cost per metre converts that distance into the same cost unit as `g(n)`. The product is admissible and consistent. Landmark preprocessing safely ignores closures because removing roads can only increase the actual remaining distance.
 
 ## 3. Algorithm interpretation
 
 - **BFS** uses a FIFO queue and optimizes edge count/hops. It does not optimize the weighted road cost.
-- **DFS** uses a deterministic LIFO stack. Its first route can be long and expensive, and its result is sensitive to graph size and neighbor ordering.
+- **DFS** uses a deterministic LIFO stack. Its first route can be long and expensive, and its result is sensitive to graph size and neighbor ordering. It can nevertheless beat other searches when any solution is acceptable and the goal lies on its first deep branch.
 - **UCS** expands the smallest accumulated weighted cost `g(n)` and tests the goal when it is removed from the priority queue.
 - **IDS** repeats depth-limited DFS with limits `0,1,2,...`. Repeated expansions in different iterations are counted because they are real search work.
 - **Greedy Best-First** expands the smallest `h(n)` and ignores accumulated cost. It may use very few expansions but return a non-optimal route.
@@ -90,7 +92,7 @@ The following measurements use University of Dhaka as source, Dhaka Medical Coll
 
 ## 5. Findings
 
-1. Greedy expanded the fewest nodes because it moved toward the goal using only straight-line proximity. Its route was nevertheless about 43% longer and had a higher weighted cost than the optimal route. Low search effort therefore does not imply low route cost.
+1. Greedy expanded the fewest nodes because it followed only the landmark remaining-cost estimate. Its route was nevertheless about 43% longer and had a higher weighted cost than the optimal route. Low search effort therefore does not imply low route cost.
 2. A* found the same minimum-cost route as UCS but expanded 31 nodes instead of 94. The heuristic reduced irrelevant exploration without sacrificing optimality.
 3. IDS found the shallow route but performed 1,233 expansions because nodes were revisited at successive depth limits. This is the expected time cost of IDS's low-memory strategy.
 4. DFS changed dramatically with network size: 323 expansions on Small, 1,480 on Medium, and 4,411 on Full. Its path also grew from 8.623 km to 37.609 km. This demonstrates that DFS performance is scenario- and ordering-dependent rather than generally better or worse than BFS.
@@ -110,6 +112,7 @@ During evaluation:
 6. Run **Compare all six** and explain why expansion counts and route costs differ.
 7. Open **six-map live lab** and show all algorithms expanding simultaneously; point out that Greedy and A* finish while DFS/IDS are still searching.
 8. Repeat comparison using Small and Full graph modes to demonstrate scale sensitivity, especially for DFS.
-9. Explain the heuristic admissibility argument and why Greedy is not optimal.
+9. Explain the ALT landmark admissibility argument and why Greedy is not optimal.
+10. Enable custom road blocking, close one route segment, and rerun all six algorithms on the identical modified graph.
 
 The generated dashboard table and expanded-node chart can be captured as the requested result screenshots. Exact runtime values may vary between runs, but route cost, scenario values, and expansion order are deterministic for unchanged inputs.

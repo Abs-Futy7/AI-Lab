@@ -4,12 +4,12 @@ from app.algorithms.astar import astar_search
 from app.algorithms.bfs import bfs_search
 from app.algorithms.dfs import dfs_search
 from app.algorithms.greedy import greedy_search
-from app.algorithms.heuristics import weighted_heuristic
+from app.algorithms.heuristics import build_landmark_heuristic, minimum_traversable_cost_per_metre
 from app.algorithms.ids import ids_search
 from app.algorithms.ucs import ucs_search
 from app.graph.costs import edge_cost_components
-from app.graph.scenarios import apply_scenario
-from app.models.schemas import ScenarioName
+from app.graph.scenarios import apply_custom_road_closures, apply_scenario
+from app.models.schemas import CustomRoadClosure, ScenarioName
 
 
 def test_bfs_returns_minimum_hop_path(graph, weights):
@@ -75,7 +75,26 @@ def test_cost_component_sum_equals_total(graph, weights):
 
 
 def test_heuristic_is_zero_at_goal(graph, weights):
-    assert weighted_heuristic(graph, "G", "G", weights.distance) == pytest.approx(0.0)
+    heuristic = build_landmark_heuristic(graph, "G", weights)
+    assert heuristic("G") == pytest.approx(0.0)
+
+
+def test_landmark_heuristic_is_admissible_and_in_cost_units(graph, weights):
+    heuristic = build_landmark_heuristic(graph, "G", weights)
+    optimal = ucs_search(graph, "S", "G", weights, 100)
+    assert minimum_traversable_cost_per_metre(graph, weights) == pytest.approx(1.0)
+    assert 0 < heuristic("S") <= optimal["total_cost"]
+
+
+def test_custom_closure_blocks_nearest_road_in_both_directions(graph):
+    graph.add_edge("A", "S", length=8.0)
+    closure = CustomRoadClosure(lat=23.7005, lon=90.4005, both_directions=True)
+    resolved = apply_custom_road_closures(graph, [closure])
+    assert resolved[0]["blocked_edge_count"] >= 1
+    u, v = resolved[0]["u"], resolved[0]["v"]
+    assert all(data["blocked"] for data in graph[u][v].values())
+    if graph.has_edge(v, u):
+        assert all(data["blocked"] for data in graph[v][u].values())
 
 
 def test_scenario_generation_is_reproducible(graph):

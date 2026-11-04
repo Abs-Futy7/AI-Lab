@@ -13,7 +13,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 
-import type { Coordinates, LayerVisibility, SearchResult } from "@/types/routing";
+import type { Coordinates, CustomRoadClosure, LayerVisibility, MapPickMode, SearchResult } from "@/types/routing";
 import { graphCoverageBounds, graphCoverageFromMetadata, graphCoverageLabel, type GraphCoverage } from "@/lib/graph-coverage";
 import { GraphCoverageOverlay } from "./GraphCoverageOverlay";
 import { PlaybackCamera } from "./PlaybackCamera";
@@ -26,6 +26,13 @@ function pointIcon(color: string, label: string) {
     iconAnchor: [17, 40],
   });
 }
+
+const closureIcon = L.divIcon({
+  className: "closure-marker-shell",
+  html: '<div class="closure-marker"><span>×</span></div>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
 
 function MapClick({ onClick }: { onClick: (point: Coordinates) => void }) {
   useMapEvents({ click: (event) => onClick({ lat: event.latlng.lat, lon: event.latlng.lng }) });
@@ -47,6 +54,7 @@ function FitRoute({ result, graphCoverage }: { result: SearchResult | null; grap
 export default function RouteMap({
   source,
   destination,
+  customClosures,
   result,
   layers,
   pickMode,
@@ -55,9 +63,10 @@ export default function RouteMap({
 }: {
   source: Coordinates;
   destination: Coordinates;
+  customClosures: CustomRoadClosure[];
   result: SearchResult | null;
   layers: LayerVisibility;
-  pickMode: "source" | "destination" | null;
+  pickMode: MapPickMode;
   playbackStep: number;
   onMapClick: (point: Coordinates) => void;
 }) {
@@ -105,6 +114,11 @@ export default function RouteMap({
         {result && layers.route && visiblePath.length > 1 && (
           <Polyline positions={visiblePath.map((point) => [point.lat, point.lng])} pathOptions={{ color: "#1d4ed8", weight: 7, opacity: 0.92 }} />
         )}
+        {customClosures.map((closure, index) => (
+          <Marker key={`custom-closure-${index}`} position={[closure.lat, closure.lon]} icon={closureIcon}>
+            <Tooltip>Custom closure {index + 1} · {closure.both_directions ? "both directions" : "one direction"}</Tooltip>
+          </Marker>
+        ))}
         <Marker position={[source.lat, source.lon]} icon={pointIcon("#16a34a", "S")}><Tooltip>Source</Tooltip></Marker>
         <Marker position={[destination.lat, destination.lon]} icon={pointIcon("#dc2626", "D")}><Tooltip>Destination</Tooltip></Marker>
       </MapContainer>
@@ -119,10 +133,11 @@ export default function RouteMap({
         <span><i className="legend-line route" /> Route</span>
         <span><i className="legend-dot expanded" /> Expanded</span>
         <span><i className="legend-line blocked" /> Blocked</span>
+        <span><i className="legend-custom-block" /> Custom closure</span>
         <span><i className="legend-line traffic" /> Traffic</span>
         <span><i className="legend-line risk" /> Risk</span>
       </div>
-      {pickMode && <div className="map-pick-notice">Click the map to set {pickMode}</div>}
+      {pickMode && <div className="map-pick-notice">{pickMode === "closure" ? "Click a road to add a custom closure" : `Click the map to set ${pickMode}`}</div>}
     </div>
   );
 }

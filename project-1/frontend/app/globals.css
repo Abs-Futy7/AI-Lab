@@ -65,6 +65,18 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .slider-row input { grid-column: 1 / -1; width: 100%; height: 3px; margin: 1px 0; }
 .validation-note { margin: 6px 0 0; color: var(--red); font-size: 10px; }
 .toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 8px; margin-top: 8px; }
+.custom-closure-control { display: grid; gap: 8px; padding: 11px; border: 1px solid #fca5a5; border-radius: 8px; background: #fff7f7; }
+.custom-closure-head { display: flex; align-items: center; justify-content: space-between; }
+.custom-closure-head output { padding: 3px 7px; color: #991b1b; border-radius: 999px; background: #fee2e2; font-size: 10px; font-weight: 850; }
+.custom-closure-control p { margin: 0; color: #64748b; font-size: 10px; line-height: 1.45; }
+.closure-direction { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.closure-direction button,.closure-mode-button,.closure-actions button { min-height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; background: white; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.closure-direction button.active { color: #991b1b; border-color: #f87171; background: #fee2e2; }
+.closure-mode-button { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.closure-mode-button.active { color: white; border-color: #dc2626; background: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,.14); }
+.closure-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.closure-actions button { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.closure-actions button:disabled { cursor: not-allowed; opacity: .45; }
 .toggle-item { display: flex; align-items: center; gap: 6px; color: #64748b; font-size: 10px; font-weight: 700; }
 .toggle-item input { accent-color: var(--blue); }
 .primary-button, .secondary-button { min-height: 41px; border-radius: 7px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 850; }
@@ -96,6 +108,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .simulation-actions select { max-width: 150px; height: 32px; border: 1px solid #cbd5e1; border-radius: 5px; color: #334155; background: white; padding: 0 6px; font-size: 11px; font-weight: 700; text-transform: none; }
 .map-frame { height: 666px; position: relative; overflow: hidden; border: 1px solid #cdd8e4; border-radius: 7px; background: #dce5ec; }
 .map-frame.picking { cursor: crosshair; box-shadow: 0 0 0 3px rgba(37,99,235,.18); }
+.map-frame.picking:has(.map-pick-notice) { cursor: crosshair; }
 .route-map { width: 100%; height: 100%; z-index: 0; }
 .map-loading { height: 666px; display: grid; place-content: center; justify-items: center; gap: 8px; color: #64748b; background: #e2e8f0; border-radius: 7px; font-size: 12px; }
 .location-marker-shell { background: transparent; border: none; }
@@ -103,6 +116,10 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .location-marker span { display: block; transform: rotate(45deg); }
 .map-legend { position: absolute; z-index: 500; bottom: 12px; left: 12px; display: flex; flex-wrap: wrap; gap: 8px 12px; max-width: calc(100% - 24px); padding: 8px 10px; border: 1px solid rgba(203,213,225,.9); border-radius: 6px; background: rgba(255,255,255,.92); backdrop-filter: blur(6px); box-shadow: 0 3px 12px rgba(15,23,42,.1); }
 .map-legend span { display: flex; align-items: center; gap: 5px; color: #475569; font-size: 10px; font-weight: 800; }
+.legend-custom-block { width: 11px; height: 11px; display: inline-grid; place-items: center; border: 2px solid white; border-radius: 50%; background: #dc2626; box-shadow: 0 0 0 1px #991b1b; }
+.closure-marker-shell { background: transparent; border: 0; }
+.closure-marker { width: 26px; height: 26px; display: grid; place-items: center; color: white; border: 3px solid white; border-radius: 50%; background: #dc2626; box-shadow: 0 2px 8px rgba(127,29,29,.45); }
+.closure-marker span { margin-top: -2px; font: 900 22px/1 Arial,sans-serif; }
 .legend-coverage { width: 15px; height: 15px; border: 2px dashed #2563eb; border-radius: 50%; background: transparent; }
 .legend-line { width: 17px; height: 3px; border-radius: 2px; background: #1d4ed8; }
 .legend-line.blocked { background: #dc2626; background: repeating-linear-gradient(90deg,#dc2626 0 4px,transparent 4px 6px); }

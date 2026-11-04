@@ -26,6 +26,14 @@ export interface CostWeights {
   risk: number;
 }
 
+export interface CustomRoadClosure {
+  lat: number;
+  lon: number;
+  both_directions: boolean;
+}
+
+export type MapPickMode = "source" | "destination" | "closure" | null;
+
 export interface CostBreakdown {
   distance_component: number;
   traffic_component: number;
@@ -73,6 +81,7 @@ export interface RouteRequest {
   scenario: Scenario;
   network_scale: NetworkScale;
   weights: CostWeights;
+  custom_blocked_roads: CustomRoadClosure[];
 }
 
 export type ComparisonRequest = Omit<RouteRequest, "algorithm">;

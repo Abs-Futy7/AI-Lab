@@ -7,7 +7,7 @@ from typing import Hashable
 import networkx as nx
 
 from app.algorithms.common import search_result
-from app.algorithms.heuristics import weighted_heuristic
+from app.algorithms.heuristics import build_landmark_heuristic
 from app.graph.costs import edge_cost
 from app.graph.helpers import get_traversable_neighbors, reconstruct_path
 from app.models.schemas import CostWeights
@@ -23,7 +23,8 @@ def astar_search(
     """A* graph search with f(n) = g(n) + admissible h(n)."""
     started = perf_counter()
     tie_breaker = count()
-    start_h = weighted_heuristic(graph, start, goal, weights.distance)
+    heuristic = build_landmark_heuristic(graph, goal, weights)
+    start_h = heuristic(start)
     # Heap stores f, tie-breaker, node, and g-at-push for stale-entry detection.
     frontier: list[tuple[float, int, Hashable, float]] = [
         (start_h, next(tie_breaker), start, 0.0)
@@ -60,7 +61,7 @@ def astar_search(
             if tentative_g < g_score.get(neighbor, float("inf")):
                 g_score[neighbor] = tentative_g
                 parent[neighbor] = (node, key)
-                h = weighted_heuristic(graph, neighbor, goal, weights.distance)
+                h = heuristic(neighbor)
                 heapq.heappush(
                     frontier, (tentative_g + h, next(tie_breaker), neighbor, tentative_g)
                 )

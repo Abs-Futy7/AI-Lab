@@ -359,13 +359,14 @@ def ids_search(graph, start, goal, weights, max_expansions, max_depth):
 
 ### 5. Greedy Best-First Search
 
-**Definition.** Greedy search expands the node that appears geographically closest to the goal according to `h(n)`. It ignores the cost already paid.
+**Definition.** Greedy search expands the node with the smallest landmark-based remaining-cost lower bound `h(n)`. It ignores the cost already paid.
 
 ```python
 def greedy_search(graph, start, goal, weights, max_expansions):
     started = perf_counter()
     tie_breaker = count()
-    start_h = weighted_heuristic(graph, start, goal, weights.distance)
+    heuristic = build_landmark_heuristic(graph, goal, weights)
+    start_h = heuristic(start)
     frontier = [(start_h, next(tie_breaker), start)]
     reached = {start}
     parent = {}
@@ -383,14 +384,14 @@ def greedy_search(graph, start, goal, weights, max_expansions):
             if neighbor not in reached:
                 reached.add(neighbor)
                 parent[neighbor] = (node, key)
-                h = weighted_heuristic(graph, neighbor, goal, weights.distance)
+                h = heuristic(neighbor)
                 heapq.heappush(frontier,
                                (h, next(tie_breaker), neighbor))
 
     return search_result(..., "frontier_exhausted")
 ```
 
-**Behavior.** Greedy often expands few nodes because it heads directly toward the goal. However, it can choose an apparently close node reached through an expensive, risky, congested, or dead-end route. Since it never compares alternative `g` values, the reached set keeps only the first discovered parent.
+**Behavior.** Greedy often expands few nodes because it follows the smallest estimated remaining cost. However, it can choose an apparently promising node reached through an expensive, risky, congested, or dead-end route. Since it never compares alternative `g` values, the reached set keeps only the first discovered parent.
 
 **Properties.** Worst-case time and space are exponential in search depth. In this finite reached-state implementation it terminates within the graph/expansion limits. It is not cost-optimal.
 
@@ -406,7 +407,8 @@ f(n) = g(n) + h(n)
 def astar_search(graph, start, goal, weights, max_expansions):
     started = perf_counter()
     tie_breaker = count()
-    start_h = weighted_heuristic(graph, start, goal, weights.distance)
+    heuristic = build_landmark_heuristic(graph, goal, weights)
+    start_h = heuristic(start)
 
     # Store g-at-push as well as f so outdated heap entries can be rejected.
     frontier = [(start_h, next(tie_breaker), start, 0.0)]
@@ -433,7 +435,7 @@ def astar_search(graph, start, goal, weights, max_expansions):
             if tentative_g < g_score.get(neighbor, inf):
                 g_score[neighbor] = tentative_g
                 parent[neighbor] = (node, key)
-                h = weighted_heuristic(graph, neighbor, goal, weights.distance)
+                h = heuristic(neighbor)
                 heapq.heappush(frontier, (
                     tentative_g + h, next(tie_breaker), neighbor, tentative_g
                 ))
@@ -441,20 +443,68 @@ def astar_search(graph, start, goal, weights, max_expansions):
     return search_result(..., "frontier_exhausted")
 ```
 
-The heuristic is weighted Haversine straight-line distance:
+The project now uses an **ALT landmark road-network heuristic**, not a Haversine-only estimate. Four deterministic boundary landmarks represent west, east, south, and north. For each landmark `L`, manual Dijkstra preprocessing records directed shortest road lengths `d(L,x)` and `d(x,L)`. Directed triangle inequalities then give a lower bound on the remaining road distance:
 
-```python
-def weighted_heuristic(graph, node, goal, distance_weight):
-    return distance_weight * haversine_distance_m(graph, node, goal)
+```text
+road_lb(n,G) = max over landmarks L of:
+    0,
+    d(L,G) - d(L,n),
+    d(n,L) - d(G,L)
 ```
 
-**Why admissible?** Road distance cannot be less than straight-line distance, and all additional traffic, condition, and risk penalties are nonnegative. Therefore `h(n)` never exceeds the cheapest possible remaining weighted cost.
+Only finite directed-distance terms are used. The heuristic converts this road-distance lower bound into the same unit as `g(n)`:
 
-**Why consistent?** Haversine distance obeys the triangle inequality. For edge `(n,n')`, straight-line distance from `n` to the goal is no greater than the road distance from `n` to `n'` plus straight-line distance from `n'` to the goal. Nonnegative penalties only increase the actual edge cost.
+```text
+minimum_unit_cost = min over unblocked edges e of cost(e) / length(e)
+h(n) = minimum_unit_cost × road_lb(n, goal)
+```
 
-**Special case.** If `weights.distance == 0`, `h(n) == 0`; A* becomes UCS, which remains correct for the other nonnegative components.
+```python
+def build_landmark_heuristic(graph, goal, weights):
+    index = prepare_landmark_index(graph)       # Four directed road-distance tables.
+    min_unit = minimum_traversable_cost_per_metre(graph, weights)
+
+    def heuristic(node):
+        road_lb = 0.0
+        for landmark in index.landmarks:
+            # Forward triangle inequality: d(L,G) <= d(L,n) + d(n,G).
+            road_lb = max(road_lb, d(landmark, goal) - d(landmark, node))
+            # Reverse directed inequality: d(n,L) <= d(n,G) + d(G,L).
+            road_lb = max(road_lb, d(node, landmark) - d(goal, landmark))
+        return min_unit * road_lb              # Metres × cost/metre = route cost.
+
+    return heuristic
+```
+
+**Why admissible?** Each landmark difference is no greater than the real remaining directed road distance. `minimum_unit_cost` is no greater than the cost per metre of any legal remaining edge. Their product therefore cannot exceed the cheapest remaining route cost.
+
+**Why consistent?** Landmark difference functions obey the directed triangle inequality. Multiplication by a global lower bound on every legal edge's cost per metre preserves `h(n) <= cost(n,n') + h(n')`.
+
+**Why ignore closures during landmark preprocessing?** Removing roads can only make the actual remaining route longer. Distances calculated on the less-restricted topology remain safe lower bounds after predefined or custom roads are blocked. The minimum unit cost itself is calculated from currently traversable edges.
 
 **Properties.** A* is complete and weighted-cost optimal here under admissibility, consistency, nonnegative edge costs, and sufficient configured search limits. Worst-case time/space remain exponential, but a useful heuristic normally expands far fewer nodes than UCS.
+
+## Interactive custom road blocking
+
+The predefined Flood and Combined Emergency scenarios produce deterministic simulated closures. The dashboard additionally supports examiner-controlled closures:
+
+1. Open **Custom road closures** in the dispatch controls.
+2. Choose **Both directions** or **One direction**.
+3. Enable **Select roads on map** and click up to 25 road locations.
+4. Run one algorithm or **Compare all six**. Every algorithm receives the identical closure list.
+5. Use **Undo last** or **Clear all** to revise the experiment.
+
+The frontend sends each click as latitude, longitude, and a direction flag. The backend finds the nearest directed road pair using point-to-segment distance. It marks every parallel edge in that direction as blocked; in two-direction mode it also blocks all reverse edges when they exist:
+
+```python
+for closure in request.custom_blocked_roads:
+    u, v = nearest_road_pair(graph, closure.lat, closure.lon)
+    block_all_parallel_edges(graph, u, v)       # Selected direction.
+    if closure.both_directions and graph.has_edge(v, u):
+        block_all_parallel_edges(graph, v, u)   # Reverse direction.
+```
+
+A blocked edge is still removed from the legal successor set rather than assigned a large finite cost. The selected click is shown immediately as a red closure marker, while the resolved blocked road is returned in the red dashed road layer after a run. Custom closures are also serialized into the separate six-map simulation URL.
 
 ## Side-by-side algorithm comparison
 
@@ -462,7 +512,7 @@ def weighted_heuristic(graph, node, goal, distance_weight):
 |---|---|---|---|---|---|---|
 | Main structure | Queue | Stack | Min-heap | Repeated stacks | Min-heap | Min-heap |
 | Priority | Depth / arrival | Latest item | `g(n)` | Depth limit | `h(n)` | `g(n)+h(n)` |
-| Uses road cost to choose expansion? | No | No | Yes | No | Only distance lower bound | Yes |
+| Uses road cost to choose expansion? | No | No | Yes | No | Landmark cost lower bound | Yes |
 | Uses heuristic? | No | No | No | No | Yes | Yes |
 | Minimum hops? | Yes | No | Not necessarily | Yes within limit | No | Not necessarily |
 | Minimum weighted cost? | No | No | Yes | No | No | Yes |
@@ -552,7 +602,7 @@ Each new depth limit restarts depth-first search from the source. That repetitio
 
 ### What makes a heuristic admissible?
 
-It never overestimates the true cheapest remaining cost. The weighted Haversine estimate includes only the unavoidable straight-line distance component and excludes nonnegative penalties.
+It never overestimates the true cheapest remaining cost. Here, directed landmark differences lower-bound remaining road distance and the minimum legal cost per metre lower-bounds the cost of travelling that distance.
 
 ### What makes a heuristic consistent?
 
@@ -560,11 +610,11 @@ For every edge `(n,n')`, `h(n) <= cost(n,n') + h(n')`. Consistency makes `f` non
 
 ### Greedy and A* both use `h`; why are their results different?
 
-Greedy uses only `h` and ignores the cost already paid. A* uses `g+h`, so it can reject a geographically promising node when reaching it is too expensive.
+Greedy uses only `h` and ignores the cost already paid. A* uses `g+h`, so it can reject a heuristically promising node when reaching it is too expensive.
 
-### When does A* become UCS?
+### When does A* behave like UCS?
 
-When the heuristic is zero. In this project that occurs when the distance weight is zero. Then `f(n)=g(n)`.
+Whenever the calculated lower bound is zero for every frontier node, because then `f(n)=g(n)`. Unlike the former heuristic, setting only the distance weight to zero does not necessarily make `h=0`: traffic, condition, or risk can still create a positive unavoidable minimum cost per metre.
 
 ### Why is A* not always faster in milliseconds?
 
@@ -756,15 +806,15 @@ edge_cost = distance_m * w_distance
 
 #### Q35. Heuristic exact ki?
 
-**Answer:** `h(n)=distance_weight * Haversine straight-line distance(n, goal)`. Traffic/condition/risk future penalty safely jana nai, tai heuristic-e add kori nai.
+**Answer:** Ekhon ALT landmark heuristic use kori. Graph-er west, east, south, north boundary-te four landmarks select kori. Manual Dijkstra preprocessing diye `d(L,x)` and `d(x,L)` road distances rakhi. Directed triangle inequality theke remaining road-distance lower bound pai. Tarpor eta graph-er minimum traversable weighted cost-per-metre diye multiply kori: `h(n)=minimum_unit_cost * landmark_road_distance_lower_bound`.
 
 #### Q36. Heuristic admissible keno?
 
-**Answer:** Actual road route straight-line distance-er cheye choto hote pare na, and additional penalties nonnegative. Tai heuristic true remaining cost overestimate kore na.
+**Answer:** Landmark triangle difference actual remaining directed road distance-er cheye boro hoy na. `minimum_unit_cost` kono legal edge-er cost-per-metre-er cheye boro na. Tai duitar product true cheapest remaining route cost overestimate kore na.
 
-#### Q37. Distance weight zero hole A* ki hoy?
+#### Q37. Distance weight zero hole A* ki UCS hoye jay?
 
-**Answer:** `h(n)=0`, tai `f(n)=g(n)` and A* UCS-er moto behave kore.
+**Answer:** Ekhon necessarily na. Distance weight zero holeo traffic, condition, ba risk-er minimum unavoidable cost-per-metre positive hote pare. Sudhu sob frontier node-er heuristic zero hole A* UCS-er moto order korbe.
 
 #### Q38. UCS/A*-e stale heap entry ki?
 
@@ -810,7 +860,7 @@ edge_cost = distance_m * w_distance
 
 #### Q48. UCS ar A*-er difference ki?
 
-**Answer:** UCS priority `g`; A* priority `g+h`. Both cost-optimal under assumptions. A* heuristic guidance use kore; `h=0` hole A* UCS-er moto.
+**Answer:** UCS priority `g`; A* priority `g+h`. Both cost-optimal under assumptions. A* directed landmark road-distance and minimum unit-cost lower bound diye guidance pay; `h=0` hole order UCS-er moto hoy.
 
 ### Comparison and metrics
 
@@ -856,7 +906,23 @@ edge_cost = distance_m * w_distance
 
 #### Q59. Ek minute-e project defend koro.
 
-**Answer:** Sir, ami Central Dhaka-r directed OSM driving graph-er upor six search algorithms manually implement korechi. Deterministic simulated traffic, condition, risk, and closures edge attributes hisebe apply kori. Blocked edge legal successor set theke remove hoy. Weighted cost distance, traffic, condition, and risk combine kore. BFS/DFS/IDS structural baselines, UCS weighted-cost optimum, Greedy heuristic-only baseline, and A* actual cost plus admissible Haversine heuristic diye optimal route efficiently khuje. Fair comparison-er jonno all algorithms same frozen graph, scenario, endpoints, and weights pay; frontend backend expansion trace replay kore.
+**Answer:** Sir, ami Central Dhaka-r directed OSM driving graph-er upor six search algorithms manually implement korechi. Deterministic simulated traffic, condition, risk, predefined closures, and user-selected custom road blocks edge attributes hisebe apply kori. Blocked edge legal successor set theke remove hoy. Weighted cost distance, traffic, condition, and risk combine kore. BFS/DFS/IDS structural baselines, UCS weighted-cost optimum, Greedy heuristic-only baseline, and A* actual cost plus admissible ALT landmark heuristic diye optimal route efficiently khuje. Fair comparison-er jonno all algorithms same frozen graph, scenario, endpoints, weights, and custom closures pay; frontend backend expansion trace replay kore.
+
+#### Q60. DFS kon situation-e onno algorithm-er cheye better hote pare?
+
+**Answer:** Jodi sudhu je kono valid solution dorkar hoy, optimal route dorkar na hoy, goal deep hoy, and deterministic neighbor order-er first branch goal-er dike jay, tahole DFS khub taratari solution pete pare. Classic DFS wide BFS frontier-er cheye kom memory-o use korte pare. Kintu eta ordering-dependent; minimum hop, distance, ba weighted cost guarantee kore na.
+
+#### Q61. Custom road blocking kivabe implement korecho?
+
+**Answer:** User map-e click korle frontend latitude, longitude, and one-way/both-way flag pathay. Backend local point-to-segment distance diye nearest directed road pair `(u,v)` resolve kore. Oi direction-er sob parallel edges-e `blocked=True` dei; both-direction select korle `(v,u)` edges-o block kori. Tarpor successor helper blocked edge reject kore.
+
+#### Q62. Compare All-e custom block fair thake kivabe?
+
+**Answer:** `prepare_run()` custom clicks ekbar resolve kore ekta frozen graph toiri kore. Tarpor six algorithms oi same graph pay. Prottek algorithm-er jonno alada nearest road select ba scenario regenerate hoy na.
+
+#### Q63. Landmark preprocessing-e blocked road ignore koro keno?
+
+**Answer:** Heuristic-er distance lower bound restrictive graph-er cheye optimistic hote hobe. Road remove korle real shortest distance same thake ba bare; kome na. Tai closure chara topology-r landmark distance closure-er poro safe lower bound. Current unblocked edges theke minimum unit cost calculate kori.
 
 ## Quick viva points
 
@@ -864,9 +930,12 @@ edge_cost = distance_m * w_distance
 - UCS expands the lowest accumulated cost `g(n)` and tests the goal when popped.
 - Greedy uses only `h(n)`, so it can be fast without being optimal.
 - A* combines actual and estimated remaining cost: `f(n) = g(n) + h(n)`.
-- A straight-line lower bound is admissible because a legal road route cannot be shorter than direct geographic distance.
+- ALT uses directed landmark triangle inequalities to lower-bound remaining road distance.
+- Multiplying by the minimum traversable cost per metre converts that distance into a safe route-cost lower bound.
 - DFS behavior depends strongly on neighbor ordering and is not optimal.
+- DFS can be faster when any solution is acceptable and the goal lies on its first deep branch.
 - IDS trades repeated work for DFS-like memory while recovering shallow-solution completeness.
+- Custom closures map user clicks to the nearest road and can block one or both directions for every algorithm.
 - Backend runtime and deliberately slowed animation duration are different measurements.
 
 For scenario-generation details, full API schemas, deployment, and project-wide limitations, also use the [main combined README](README.md).

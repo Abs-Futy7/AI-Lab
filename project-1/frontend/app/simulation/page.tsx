@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import "./simulation.css";
 
 import ComparisonSimulation from "@/components/routing/ComparisonSimulation";
-import type { ComparisonRequest, CostWeights, NetworkScale, Scenario } from "@/types/routing";
+import type { ComparisonRequest, CostWeights, CustomRoadClosure, NetworkScale, Scenario } from "@/types/routing";
 
 export const metadata: Metadata = {
   title: "Six-Way Live Search Simulation",
@@ -21,6 +21,20 @@ function value(input: string | string[] | undefined): string | undefined {
 function number(input: string | string[] | undefined, fallback: number): number {
   const parsed = Number(value(input));
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function customClosures(input: string | string[] | undefined): CustomRoadClosure[] {
+  try {
+    const parsed: unknown = JSON.parse(value(input) ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, 25).filter((item): item is CustomRoadClosure => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Partial<CustomRoadClosure>;
+      return Number.isFinite(candidate.lat) && Number.isFinite(candidate.lon) && typeof candidate.both_directions === "boolean";
+    });
+  } catch {
+    return [];
+  }
 }
 
 async function SimulationPageContent({ searchParams }: PageProps<"/simulation">) {
@@ -45,6 +59,7 @@ async function SimulationPageContent({ searchParams }: PageProps<"/simulation">)
     scenario: scenarioValue && scenarios.includes(scenarioValue) ? scenarioValue : "normal",
     network_scale: scaleValue && scales.includes(scaleValue) ? scaleValue : "full",
     weights,
+    custom_blocked_roads: customClosures(query.custom_blocks),
   };
   return <ComparisonSimulation request={request} />;
 }

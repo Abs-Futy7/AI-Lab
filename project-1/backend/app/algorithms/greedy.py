@@ -6,7 +6,7 @@ from typing import Hashable
 import networkx as nx
 
 from app.algorithms.common import search_result
-from app.algorithms.heuristics import weighted_heuristic
+from app.algorithms.heuristics import build_landmark_heuristic
 from app.graph.helpers import get_traversable_neighbors, reconstruct_path
 from app.models.schemas import CostWeights
 
@@ -21,7 +21,8 @@ def greedy_search(
     """Greedy best-first search; frontier priority is h(n) only."""
     started = perf_counter()
     tie_breaker = count()
-    start_h = weighted_heuristic(graph, start, goal, weights.distance)
+    heuristic = build_landmark_heuristic(graph, goal, weights)
+    start_h = heuristic(start)
     frontier: list[tuple[float, int, Hashable]] = [(start_h, next(tie_breaker), start)]
     reached = {start}
     parent: dict[Hashable, tuple[Hashable, Hashable]] = {}
@@ -43,7 +44,7 @@ def greedy_search(
             if neighbor not in reached:
                 reached.add(neighbor)
                 parent[neighbor] = (node, key)
-                h = weighted_heuristic(graph, neighbor, goal, weights.distance)
+                h = heuristic(neighbor)
                 heapq.heappush(frontier, (h, next(tie_breaker), neighbor))
 
     return search_result("greedy", graph, [], [], expanded, weights, started, "frontier_exhausted")

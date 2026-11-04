@@ -51,7 +51,7 @@ The project directly demonstrates these slide concepts:
 - informed search with Greedy Best-First Search and A*;
 - `g(n)`, `h(n)`, and `f(n) = g(n) + h(n)`;
 - completeness, optimality, time behavior, and memory behavior;
-- admissible and consistent straight-line heuristics;
+- admissible and consistent ALT landmark road-network heuristics;
 - the difference between a low search effort and a low route cost;
 - the effect of graph size, branching, neighbor order, and heuristic quality.
 
@@ -121,7 +121,7 @@ project1/
 |   |   |   |-- ids.py                  Repeated depth-limited DFS
 |   |   |   |-- greedy.py               h(n)-ordered search
 |   |   |   |-- astar.py                g(n) + h(n) search
-|   |   |   |-- heuristics.py           Haversine lower bound
+|   |   |   |-- heuristics.py           ALT landmark road-cost lower bound
 |   |   |   `-- common.py               Shared result construction
 |   |   |-- graph/
 |   |   |   |-- loader.py               OSM download/cache/fallback
@@ -278,19 +278,35 @@ Distance multiplies every operational term. This models exposure: traveling thro
 
 A blocked edge is not assigned a very large cost. It is removed from the available action set by `get_traversable_neighbors`. If `edge_cost` is called directly on a blocked edge, it raises `ValueError`. This preserves the problem meaning: an impassable road is not a valid action.
 
+### Examiner-controlled custom road closures
+
+Besides deterministic Flood and Combined Emergency closures, the Lab 1 dashboard lets the user construct a closure experiment interactively. The user chooses one-direction or both-direction blocking, enables selection mode, and clicks up to 25 map locations. Each request carries the selected coordinates and direction flags.
+
+The backend measures each click's local point-to-segment distance to every directed road pair and resolves the nearest `(u,v)`. It marks all parallel edges from `u` to `v` as blocked. Both-direction mode also blocks all existing reverse `(v,u)` edges. **Undo last** and **Clear all** make the experiment editable, and red map markers distinguish user selections from scenario-generated closures.
+
+The separate six-map window receives the same serialized selection list. `prepare_run()` resolves it once on the shared scenario graph before any algorithm starts, so BFS, DFS, UCS, IDS, Greedy, and A* all face exactly the same custom obstruction.
+
 ### Parallel edges
 
 Because the graph is a `MultiDiGraph`, `(u, v)` may have multiple keyed edges. `get_best_traversable_edge` selects the lowest-cost unblocked parallel edge using the active weights. Therefore every algorithm uses the same deterministic physical edge for a chosen neighbor, even when that algorithm does not use cost to order its frontier.
 
 ## Heuristic design
 
-Greedy Best-First and A* use a geographic Haversine heuristic:
+Greedy Best-First and A* now use an ALT landmark heuristic that understands the directed road topology. Four deterministic boundary nodes—west, east, south, and north—are selected as landmarks. Manual Dijkstra preprocessing stores shortest road lengths from and to each landmark.
+
+For node `n`, goal `G`, and landmark `L`, directed triangle inequalities provide:
 
 ```text
-h(n) = w_distance * straight_line_distance(n, goal)
+road_lb(n,G) = max over all landmarks of:
+    0,
+    d(L,G) - d(L,n),
+    d(n,L) - d(G,L)
+
+minimum_unit_cost = min over unblocked edges e of cost(e) / length(e)
+h(n) = minimum_unit_cost * road_lb(n,G)
 ```
 
-The Haversine formula estimates great-circle distance between two latitude/longitude points on Earth.
+Thus `h(n)` is expressed in the same weighted-cost unit as `g(n)`; it is not the accumulated cost multiplied by an arbitrary heuristic factor.
 
 ### Why the heuristic is admissible
 
@@ -302,14 +318,7 @@ The slides define an admissible heuristic by:
 
 where `h*(n)` is the true cheapest remaining cost.
 
-For this project:
-
-1. straight-line distance cannot exceed the physical road distance required to reach the goal;
-2. `w_distance` is nonnegative;
-3. traffic, road-condition, and risk contributions are nonnegative;
-4. therefore the true remaining weighted cost is at least the weighted straight-line distance.
-
-So `h(n)` never overestimates the cheapest remaining weighted cost.
+For this project, each finite landmark difference is a lower bound on the true remaining directed road distance. `minimum_unit_cost` is no greater than any legal edge's weighted cost per metre. Therefore their product cannot exceed the cheapest remaining route cost. Landmark distances ignore closures deliberately: removing roads can only keep or increase the actual route distance, so the original topology still supplies a safe optimistic bound.
 
 ### Why the heuristic is consistent
 
@@ -319,14 +328,14 @@ Consistency requires, for every successor `n'`:
 h(n) <= C(n, n') + h(n')
 ```
 
-Straight-line distance obeys the triangle inequality. Also, the edge cost is at least `w_distance` multiplied by the edge's road distance, and road distance is at least the straight-line distance between its endpoints. Therefore the inequality holds under this cost model.
+Landmark difference functions obey the directed triangle inequality. Scaling them by a global value no greater than every traversable edge's cost per metre preserves the consistency inequality under this cost model.
 
 Consequences:
 
 - A* can safely accept the goal when it is popped from the frontier;
 - `f` values are nondecreasing along an optimal path under normal assumptions;
-- A* retains cost optimality while using geographic guidance;
-- when `w_distance = 0`, `h(n) = 0` everywhere and A* becomes UCS.
+- A* retains cost optimality while using road-topology guidance;
+- setting only `w_distance = 0` no longer necessarily makes `h(n)=0`, because other unavoidable edge components can still produce a positive minimum unit cost.
 
 Greedy uses the same `h(n)`, but admissibility does not make Greedy optimal because Greedy ignores the cost already paid.
 
@@ -594,7 +603,8 @@ f(n) = h(n)
 #### Core code structure
 
 ```python
-start_h = weighted_heuristic(graph, start, goal, weights.distance)
+heuristic = build_landmark_heuristic(graph, goal, weights)
+start_h = heuristic(start)
 frontier = [(start_h, tie_breaker, start)]
 reached = {start}
 
@@ -607,16 +617,16 @@ while frontier:
         if neighbor not in reached:
             reached.add(neighbor)
             parent[neighbor] = (node, key)
-            h = weighted_heuristic(graph, neighbor, goal, weights.distance)
+            h = heuristic(neighbor)
             heapq.heappush(frontier, (h, tie_breaker, neighbor))
 ```
 
 #### Behavior
 
-- Always expands the state that appears geographically closest to the destination.
+- Always expands the state with the smallest landmark-based remaining-cost lower bound.
 - Ignores the accumulated cost `g(n)`.
 - Often expands dramatically fewer nodes than every other algorithm.
-- Can choose a long, congested, risky, or expensive detour because a locally promising straight-line direction is not necessarily a globally good route.
+- Can choose a long, congested, risky, or expensive detour because a low remaining-cost estimate does not include the cost already paid.
 
 The slide deck compares Greedy to a hiker who always walks toward the point that appears closest to camp, even when that direction leads to a bad obstacle or detour. The Dhaka road graph exhibits the same effect through one-way roads, irregular connectivity, and scenario penalties.
 
@@ -639,13 +649,14 @@ f(n) = g(n) + h(n)
 ```
 
 - `g(n)`: actual weighted cost already paid;
-- `h(n)`: admissible estimated remaining distance cost;
+- `h(n)`: admissible landmark-based remaining route-cost lower bound;
 - `f(n)`: estimated total solution cost through `n`.
 
 #### Core code structure
 
 ```python
-frontier = [(h(start), tie_breaker, start, 0.0)]
+heuristic = build_landmark_heuristic(graph, goal, weights)
+frontier = [(heuristic(start), tie_breaker, start, 0.0)]
 g_score = {start: 0.0}
 
 while frontier:
@@ -660,7 +671,7 @@ while frontier:
         if tentative_g < g_score.get(neighbor, infinity):
             g_score[neighbor] = tentative_g
             parent[neighbor] = (node, key)
-            h = weighted_heuristic(graph, neighbor, goal, weights.distance)
+            h = heuristic(neighbor)
             heapq.heappush(
                 frontier,
                 (tentative_g + h, tie_breaker, neighbor, tentative_g),
@@ -682,7 +693,7 @@ A* balances two pressures:
 1. UCS-like caution through `g(n)` prevents the search from forgetting an expensive route already traveled.
 2. Greedy-like direction through `h(n)` reduces irrelevant exploration.
 
-With this project's admissible, consistent heuristic, A* returns the same minimum weighted cost as UCS while commonly expanding fewer nodes. If the heuristic is zero, its ordering becomes identical to UCS apart from harmless tie details.
+With this project's admissible, consistent heuristic, A* returns the same minimum weighted cost as UCS while commonly expanding fewer nodes. If the calculated lower bound happens to be zero everywhere, its ordering becomes identical to UCS apart from harmless tie details.
 
 #### Optimal efficiency interpretation
 
@@ -1097,7 +1108,7 @@ The informed-search slide deck introduces several algorithms not implemented in 
 - **Recursive Best-First Search (RBFS)**: approximate best-first order with linear memory.
 - **Simplified Memory-Bounded A* (SMA*)**: drop and later regenerate the worst frontier leaves when memory fills.
 - **Bidirectional Search**: search forward from the source and backward from the destination.
-- **Alternative heuristics**: landmark distances, learned travel time, or safe combinations such as `max(h1, h2)` when both are admissible.
+- **Additional heuristics**: learned travel time or safe combinations such as `max(h1, h2)` when both estimates are admissible and use compatible units.
 
 Any added algorithm should use the same frozen graph, centralized cost function, blocked-edge rule, expansion definition, and result schema so comparisons remain fair.
 
@@ -1112,7 +1123,9 @@ Any added algorithm should use the same frozen graph, centralized cost function,
 7. Run Greedy and compare low expansion count with route cost.
 8. Run A* and explain `g(n) + h(n)`, admissibility, and consistency.
 9. Change to Heavy Traffic or Flood and inspect the hazard overlays.
-10. Verify no route crosses a blocked edge.
+10. Enable Custom road closures, click a route segment, and rerun the search.
+11. Compare one-direction and both-direction closure behavior.
+12. Verify no route crosses a blocked edge and that all-six comparison uses the same closure set.
 11. Run `Compare all six` and inspect the table and expanded-node chart.
 12. Open the six-map live lab and compare completion order on the shared timeline.
 13. Explain why animation duration is different from backend runtime.

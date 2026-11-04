@@ -19,7 +19,7 @@ The application opens on a responsive project-selection page. Project 01 opens L
 
 ### Lab 1: `/lab1`
 
-Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka road graph. It includes scenario controls, weighted costs, expanded nodes, graph coverage, route analysis, a direct Back to Project 1 action, and a synchronized comparison window. The six simulations appear first and finish with identical source/destination camera bounds; analysis and expanded-node, runtime, weighted-cost, and route-distance graphs follow underneath.
+Visualizes BFS, DFS, UCS, IDS, Greedy Best-First, and A* over the Central Dhaka road graph. It includes scenario controls, weighted costs, expanded nodes, graph coverage, route analysis, ALT landmark guidance, and interactive one-way or two-way custom road closures selected directly on the map. The identical closure set is carried into the synchronized six-algorithm window. The six simulations appear first and finish with identical source/destination camera bounds; analysis and expanded-node, runtime, weighted-cost, and route-distance graphs follow underneath.
 
 ### Lab 2: `/lab2`
 

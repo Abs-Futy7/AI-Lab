@@ -12,10 +12,11 @@ from app.algorithms.dfs import dfs_search
 from app.algorithms.greedy import greedy_search
 from app.algorithms.ids import ids_search
 from app.algorithms.ucs import ucs_search
+from app.algorithms.heuristics import prepare_landmark_index
 from app.config import settings
 from app.graph.helpers import edge_segment, nodes_to_coordinates
 from app.graph.loader import get_base_graph, nearest_node
-from app.graph.scenarios import apply_scenario
+from app.graph.scenarios import apply_custom_road_closures, apply_scenario
 from app.emergency.models import RoadScenario
 from app.models.schemas import (
     AlgorithmName,
@@ -27,9 +28,10 @@ from app.models.schemas import (
 )
 
 HEURISTIC_EXPLANATION = (
-    "h(n) = w_distance × straight-line distance(n, goal). Straight-line distance is a "
-    "lower bound on road distance, and all additional penalties are nonnegative, so this is "
-    "an optimistic (admissible) estimate. If w_distance is zero, A* behaves like UCS."
+    "ALT road-network heuristic: four boundary landmarks provide a directed road-distance "
+    "lower bound through triangle inequalities. That distance is multiplied by the minimum "
+    "traversable weighted cost per metre, so h(n) uses road topology rather than only "
+    "geographic proximity while remaining an admissible remaining-cost lower bound."
 )
 NO_HEURISTIC_EXPLANATION = "This algorithm does not use h(n)."
 
@@ -231,10 +233,26 @@ def prepare_run(request: RouteRequest | CompareRequest):
     graph, metadata = apply_scenario(
         experiment_graph, request.scenario, settings.random_seed
     )
+    needs_landmarks = (
+        isinstance(request, CompareRequest)
+        or request.algorithm in (AlgorithmName.greedy, AlgorithmName.astar)
+    )
+    landmark_index = prepare_landmark_index(graph) if needs_landmarks else None
+    resolved_closures = apply_custom_road_closures(graph, request.custom_blocked_roads)
+    scenario_blocked_edges = int(metadata.get("blocked_edges", 0))
+    total_blocked_edges = sum(
+        1 for *_, edge in graph.edges(data=True) if bool(edge.get("blocked", False))
+    )
     metadata.update({
         "network_scale": request.network_scale.value,
         "node_count": graph.number_of_nodes(),
         "edge_count": graph.number_of_edges(),
+        "heuristic_landmarks": len(landmark_index.landmarks) if landmark_index else 0,
+        "heuristic_preprocessing_ms": round(landmark_index.preprocessing_ms, 3) if landmark_index else 0.0,
+        "custom_closure_selections": len(resolved_closures),
+        "custom_blocked_edges": sum(item["blocked_edge_count"] for item in resolved_closures),
+        "scenario_blocked_edges": scenario_blocked_edges,
+        "blocked_edges": total_blocked_edges,
         **_graph_coverage_metadata(graph),
     })
     return graph, source, destination, metadata, _road_layers(graph)

@@ -1,11 +1,11 @@
-import { GitCompareArrows, LoaderCircle, Navigation, PanelsTopLeft } from "lucide-react";
+import { Ban, GitCompareArrows, LoaderCircle, Navigation, PanelsTopLeft, Trash2, Undo2 } from "lucide-react";
 
 import { AlgorithmSelector } from "./AlgorithmSelector";
 import { LocationSelector } from "./LocationSelector";
 import { NetworkScaleSelector } from "./NetworkScaleSelector";
 import { ScenarioSelector } from "./ScenarioSelector";
 import { WeightControls } from "./WeightControls";
-import type { Algorithm, Coordinates, CostWeights, LayerVisibility, NetworkScale, Scenario } from "@/types/routing";
+import type { Algorithm, Coordinates, CostWeights, CustomRoadClosure, LayerVisibility, MapPickMode, NetworkScale, Scenario } from "@/types/routing";
 
 export function ControlPanel(props: {
   source: Coordinates;
@@ -15,7 +15,9 @@ export function ControlPanel(props: {
   networkScale: NetworkScale;
   weights: CostWeights;
   layers: LayerVisibility;
-  pickMode: "source" | "destination" | null;
+  pickMode: MapPickMode;
+  customClosures: CustomRoadClosure[];
+  closureBothDirections: boolean;
   loading: boolean;
   onSource: (value: Coordinates) => void;
   onDestination: (value: Coordinates) => void;
@@ -24,7 +26,10 @@ export function ControlPanel(props: {
   onNetworkScale: (value: NetworkScale) => void;
   onWeights: (value: CostWeights) => void;
   onLayers: (value: LayerVisibility) => void;
-  onPickMode: (value: "source" | "destination" | null) => void;
+  onPickMode: (value: MapPickMode) => void;
+  onClosureBothDirections: (value: boolean) => void;
+  onUndoClosure: () => void;
+  onClearClosures: () => void;
   onRun: () => void;
   onCompare: () => void;
   onOpenSimulation: () => void;
@@ -45,6 +50,21 @@ export function ControlPanel(props: {
       <ScenarioSelector value={props.scenario} onChange={props.onScenario} />
       <NetworkScaleSelector value={props.networkScale} onChange={props.onNetworkScale} />
       <WeightControls value={props.weights} onChange={props.onWeights} />
+      <div className="custom-closure-control">
+        <div className="custom-closure-head"><span className="section-title">Custom road closures</span><output>{props.customClosures.length}/25</output></div>
+        <p>Enable blocking, then click directly on roads in the map.</p>
+        <div className="closure-direction" role="group" aria-label="Road closure direction">
+          <button className={props.closureBothDirections ? "active" : ""} type="button" onClick={() => props.onClosureBothDirections(true)}>Both directions</button>
+          <button className={!props.closureBothDirections ? "active" : ""} type="button" onClick={() => props.onClosureBothDirections(false)}>One direction</button>
+        </div>
+        <button className={`closure-mode-button${props.pickMode === "closure" ? " active" : ""}`} type="button" onClick={() => props.onPickMode(props.pickMode === "closure" ? null : "closure")}>
+          <Ban size={15} /> {props.pickMode === "closure" ? "Blocking mode active" : "Select roads on map"}
+        </button>
+        <div className="closure-actions">
+          <button type="button" disabled={!props.customClosures.length} onClick={props.onUndoClosure}><Undo2 size={14} /> Undo last</button>
+          <button type="button" disabled={!props.customClosures.length} onClick={props.onClearClosures}><Trash2 size={14} /> Clear all</button>
+        </div>
+      </div>
       <div>
         <span className="section-title">Map layers</span>
         <div className="toggle-grid">

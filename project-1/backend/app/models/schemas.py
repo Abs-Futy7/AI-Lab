@@ -42,6 +42,12 @@ class CostWeights(BaseModel):
         return self
 
 
+class CustomRoadClosure(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    both_directions: bool = True
+
+
 class RouteRequest(BaseModel):
     source_lat: float = Field(ge=-90, le=90)
     source_lon: float = Field(ge=-180, le=180)
@@ -51,6 +57,7 @@ class RouteRequest(BaseModel):
     scenario: ScenarioName = ScenarioName.normal
     network_scale: NetworkScale = NetworkScale.full
     weights: CostWeights = Field(default_factory=CostWeights)
+    custom_blocked_roads: list[CustomRoadClosure] = Field(default_factory=list, max_length=25)
 
 
 class CompareRequest(BaseModel):
@@ -61,6 +68,7 @@ class CompareRequest(BaseModel):
     scenario: ScenarioName = ScenarioName.normal
     network_scale: NetworkScale = NetworkScale.full
     weights: CostWeights = Field(default_factory=CostWeights)
+    custom_blocked_roads: list[CustomRoadClosure] = Field(default_factory=list, max_length=25)
 
 
 class Coordinate(BaseModel):

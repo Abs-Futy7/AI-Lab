@@ -14,7 +14,7 @@ import { ExpandedNodesChart } from "./ExpandedNodesChart";
 import { MetricsPanel } from "./MetricsPanel";
 import { SimulationControls } from "./SimulationControls";
 import { compareRoutes, findRoute, readableApiError } from "@/lib/api";
-import type { Algorithm, CompareResponse, Coordinates, CostWeights, LayerVisibility, NetworkScale, Scenario, SearchResult } from "@/types/routing";
+import type { Algorithm, CompareResponse, Coordinates, CostWeights, CustomRoadClosure, LayerVisibility, MapPickMode, NetworkScale, Scenario, SearchResult } from "@/types/routing";
 
 const RouteMap = dynamic(() => import("./RouteMap"), {
   ssr: false,
@@ -31,7 +31,9 @@ export default function RoutingDashboard() {
   const [networkScale, setNetworkScale] = useState<NetworkScale>("full");
   const [weights, setWeights] = useState<CostWeights>(initialWeights);
   const [layers, setLayers] = useState<LayerVisibility>({ route: true, expanded: true, blocked: true, traffic: true, risk: true, graphCoverage: true, autoFrame: true });
-  const [pickMode, setPickMode] = useState<"source" | "destination" | null>(null);
+  const [pickMode, setPickMode] = useState<MapPickMode>(null);
+  const [customClosures, setCustomClosures] = useState<CustomRoadClosure[]>([]);
+  const [closureBothDirections, setClosureBothDirections] = useState(true);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [comparison, setComparison] = useState<CompareResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,7 +61,7 @@ export default function RoutingDashboard() {
   const baseRequest = {
     source_lat: source.lat, source_lon: source.lon,
     destination_lat: destination.lat, destination_lon: destination.lon,
-    scenario, network_scale: networkScale, weights,
+    scenario, network_scale: networkScale, weights, custom_blocked_roads: customClosures,
   };
 
   function resetExperiment() {
@@ -106,6 +108,12 @@ export default function RoutingDashboard() {
   }
 
   function mapClicked(point: Coordinates) {
+    if (pickMode === "closure") {
+      if (customClosures.length >= 25) return;
+      setCustomClosures((current) => [...current, { ...point, both_directions: closureBothDirections }]);
+      resetExperiment();
+      return;
+    }
     if (pickMode === "source") changeSource(point);
     if (pickMode === "destination") changeDestination(point);
     if (pickMode) setPickMode(null);
@@ -123,6 +131,7 @@ export default function RoutingDashboard() {
       w_traffic: String(weights.traffic),
       w_condition: String(weights.condition),
       w_risk: String(weights.risk),
+      custom_blocks: JSON.stringify(customClosures),
     });
     window.open(`/simulation?${query.toString()}`, "_blank", "noopener,noreferrer");
   }
@@ -138,11 +147,11 @@ export default function RoutingDashboard() {
       </header>
       {error && <div className="error-banner" role="alert"><ShieldAlert size={18} /><span>{error}</span><button onClick={() => setError(null)} type="button">Dismiss</button></div>}
       <div className="workspace-grid">
-        <ControlPanel source={source} destination={destination} algorithm={algorithm} scenario={scenario} networkScale={networkScale} weights={weights} layers={layers} pickMode={pickMode} loading={loading} onSource={changeSource} onDestination={changeDestination} onAlgorithm={changeAlgorithm} onScenario={changeScenario} onNetworkScale={changeNetworkScale} onWeights={changeWeights} onLayers={setLayers} onPickMode={setPickMode} onRun={runRoute} onCompare={runComparison} onOpenSimulation={openSimulationWindow} />
+        <ControlPanel source={source} destination={destination} algorithm={algorithm} scenario={scenario} networkScale={networkScale} weights={weights} layers={layers} pickMode={pickMode} customClosures={customClosures} closureBothDirections={closureBothDirections} loading={loading} onSource={changeSource} onDestination={changeDestination} onAlgorithm={changeAlgorithm} onScenario={changeScenario} onNetworkScale={changeNetworkScale} onWeights={changeWeights} onLayers={setLayers} onPickMode={setPickMode} onClosureBothDirections={setClosureBothDirections} onUndoClosure={() => { setCustomClosures((current) => current.slice(0, -1)); resetExperiment(); }} onClearClosures={() => { setCustomClosures([]); resetExperiment(); }} onRun={runRoute} onCompare={runComparison} onOpenSimulation={openSimulationWindow} />
         <section className="map-section">
           <div className="map-title-row"><div><span className="eyebrow">Operational map</span><h2>Live search simulation</h2></div><div className="scenario-chip">{scenario.replaceAll("_", " ")}</div></div>
           <SimulationControls available={Boolean(result)} playing={playing} step={playbackStep} expandedCount={expandedCount} pathCount={pathCount} batchSize={playbackBatch} onPlaying={setPlaying} onStep={() => setPlaybackStep((current) => Math.min(playbackTotal, current + 1))} onReset={() => { setPlaybackStep(0); setPlaying(true); }} onBatchSize={setPlaybackBatch} />
-          <RouteMap source={source} destination={destination} result={result} layers={layers} pickMode={pickMode} playbackStep={playbackStep} onMapClick={mapClicked} />
+          <RouteMap source={source} destination={destination} customClosures={customClosures} result={result} layers={layers} pickMode={pickMode} playbackStep={playbackStep} onMapClick={mapClicked} />
         </section>
         <aside className="intel-column">{comparison && <BestAlgorithmSheet comparison={comparison} activeAlgorithm={algorithm} onInspect={changeAlgorithm} />}<MetricsPanel result={result} /><CostBreakdown result={result} /></aside>
       </div>
