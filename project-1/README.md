@@ -1319,8 +1319,10 @@ The dedicated `/lab2` page contains:
 - fleet readiness cards for every fixed dispatch station, synchronized with the active allocation step;
 - total incidents, CSP variables, resources, allocations, and violations;
 - solver-specific metrics and measured runtime;
-- a same-scenario comparison view;
-- radar, scatter, and allocation-donut visualizations with labeled axes and explanatory legends;
+- a same-scenario comparison dashboard placed immediately after the benchmark cards;
+- a transparent per-run recommendation plus fastest, leanest-exact-search, and lowest-cost conclusions;
+- radar, runtime/effort scatter, operational cost/response scatter, allocation donuts, and a normalized exact-value heatmap;
+- derived allocation rate, pruning rate, cost per allocation, allocations per effort, throughput, and Min-Conflicts conflict-reduction calculations;
 - algorithm-specific search-flow diagrams and an axis-labeled Min-Conflicts history chart instead of empty trace panels;
 - expanded-node, runtime, weighted-cost, and route-distance graphs in the six-algorithm Lab-1 comparison window;
 - the real domain-pruning inspector and LCV order;

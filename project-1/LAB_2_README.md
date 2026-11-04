@@ -790,6 +790,37 @@ Run AC-3 preprocessing
 
 Exact-search nodes and local-search repair steps are different work units; the UI names and visualizes them separately.
 
+### Comparison dashboard and derived calculations
+
+After **Compare all solvers**, the dashboard now appears immediately below the three summary cards so it cannot be missed during evaluation. All calculations use the three results returned for one frozen scenario; no solver receives regenerated incidents, resources, domains, routes, closures, or seed.
+
+The comparison includes:
+
+- an exact-value table for solution status, allocations, effort, solver-specific recovery events, conflicts, and runtime;
+- a per-run recommendation that prioritizes complete satisfaction, allocation rate, final conflicts, response time, dispatch cost, and finally runtime;
+- separate fastest-runtime, leanest-exact-search, and lowest-cost conclusions;
+- a radar profile for speed, low constraint-check work, allocation, conflict control, and shared domain pruning;
+- a runtime-versus-work scatter plot, with explicit notice that exact-search nodes and Min-Conflicts repair steps are different units;
+- an operational scatter plot comparing average response time with dispatch cost per allocation;
+- allocation/unallocation donuts;
+- a normalized heatmap containing exact values and within-run scores;
+- formula cards for each solver.
+
+The derived values are:
+
+```text
+allocation_rate       = allocated_requirements / total_requirements × 100
+domain_pruning_rate   = pruned_domain_values / initial_domain_values × 100
+cost_per_allocation   = total_dispatch_cost / allocated_requirements
+allocations_per_effort= allocated_requirements / recorded_work_units
+throughput            = allocated_requirements / (runtime_ms / 1000)
+conflict_reduction    = (1 - final_conflicts / initial_conflicts) × 100
+```
+
+`conflict_reduction` is shown only for Min-Conflicts because exact Backtracking and CBJ maintain consistent partial assignments instead of beginning with a complete conflicted assignment. `allocations_per_effort` is meaningful within a solver family; exact nodes and local repair steps must not be presented as identical operations. Runtime excludes route-domain preparation and browser animation.
+
+The recommendation is a transparent UI ranking for the current scenario, not a mathematical claim that one CSP algorithm is universally best. Backtracking and CBJ remain complete under the documented finite/no-limit assumptions; Min-Conflicts can be faster but cannot prove unsatisfiability.
+
 ```text
 backend/app/
 |-- emergency/
@@ -909,6 +940,18 @@ Preprocessing is shared. AC-3 is not counted as a fourth allocation solver becau
 **What does the deterministic seed control?** Scenario generation and Min-Conflicts' conflicted-variable selection. The same request and seed make classroom comparisons reproducible.
 
 **Why clone the CSP for comparison?** AC-3 and Forward Checking mutate domains and metrics. Without deep-enough clones, the second solver would receive state pruned or measured by the first, making comparison invalid.
+
+**Comparison-e kon solver-ke best bola hoy?** Universal best bola hoy na. Current run-e age complete solution, tarpor higher allocation rate, fewer final conflicts, lower average response, lower cost per allocation, and finally lower runtime diye recommendation rank kori.
+
+**Search nodes ar Min-Conflicts repair steps directly compare kora jay?** Na. Exact solver-er node holo recursive partial-assignment state; Min-Conflicts step holo complete assignment-er repair iteration. Graph-e duita clearly label kora, and leanest exact-search conclusion sudhu Backtracking ar CBJ-r moddhe kora hoy.
+
+**Cost per allocation kivabe calculate koro?** `total_dispatch_cost / requirements_allocated`. Eta total cost-ke allocation count diye normalize kore, tai different partial-result size holeo operational cost bujha easier hoy.
+
+**Throughput beshi mane solver always better?** Na. `allocated / runtime_seconds` sudhu solver-speed indicator. Incomplete ba conflicting result fast holeo complete consistent result-er cheye automatically better na.
+
+**Radar score ki raw metric?** Na. Eta same run-er three solver-er moddhe normalized 30–100 presentation score. Exact raw value table and heatmap-e dekhano hoy, tai examiner normalized shape ar real measurement duita-i verify korte paren.
+
+**Min-Conflicts-er conflict reduction exact solver-e N/A keno?** Min-Conflicts complete but initially conflicted assignment repair kore, tai initial-to-final conflict reduction meaningful. Backtracking and CBJ consistent partial assignment build kore; tader jonno same formula conceptually equivalent na.
 
 **Why cache routes by center and incident?** Vehicles of the same center start at identical coordinates. Their center-to-incident road calculation is identical, so reusing it avoids redundant A* runs while keeping vehicle IDs distinct CSP values.
 
