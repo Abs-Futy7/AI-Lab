@@ -2,12 +2,13 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Ambulance, BrainCircuit, MapPinned, Play, RefreshCw, ShieldAlert } from "lucide-react";
 
-import { compareLab2Scenario, generateLab2Scenario, readableApiError, solveLab2Scenario } from "@/lib/api";
+import { generateLab2Scenario, readableApiError, solveLab2Scenario } from "@/lib/api";
+import { LAB2_COMPARISON_SCENARIO_KEY } from "@/lib/lab2-comparison";
 import type { CSPAlgorithm, DomainInspection, Lab2GenerateRequest, Lab2Result, Lab2Scenario } from "@/types/lab2";
-import Lab2ComparisonVisuals from "./Lab2ComparisonVisuals";
 import Lab2SearchVisual from "./Lab2SearchVisual";
 
 const EmergencyMap = dynamic(() => import("./EmergencyMap"), {
@@ -34,11 +35,11 @@ function number(value: number) { return new Intl.NumberFormat().format(value); }
 function label(value: string) { return value.replaceAll("_", " "); }
 
 export default function Lab2Dashboard() {
+  const router = useRouter();
   const [config, setConfig] = useState<Lab2GenerateRequest>(initialConfig);
   const [algorithm, setAlgorithm] = useState<CSPAlgorithm>("backtracking");
   const [scenario, setScenario] = useState<Lab2Scenario | null>(null);
   const [result, setResult] = useState<Lab2Result | null>(null);
-  const [comparison, setComparison] = useState<Record<CSPAlgorithm, Lab2Result> | null>(null);
   const [selectedVariable, setSelectedVariable] = useState<string>("");
   const [loading, setLoading] = useState<"generate" | "solve" | "compare" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export default function Lab2Dashboard() {
       const payload = { ...config };
       if (payload.scale !== "custom") delete payload.request_count;
       const data = await generateLab2Scenario(payload);
-      setScenario(data); setResult(null); setComparison(null); setPlayStep(0); setPlaying(false);
+      setScenario(data); setResult(null); setPlayStep(0); setPlaying(false);
     } catch (requestError) { setError(readableApiError(requestError)); }
     finally { setLoading(null); }
   }
@@ -84,17 +85,14 @@ export default function Lab2Dashboard() {
     finally { setLoading(null); }
   }
 
-  async function compare() {
+  function compare() {
     if (!scenario) return;
-    setLoading("compare"); setError(null);
     try {
-      const data = await compareLab2Scenario(scenario);
-      setComparison(data.results);
-      const selected = data.results[algorithm];
-      setResult(selected); setSelectedVariable(selected.domain_inspection[0]?.variable ?? "");
-      setPlayStep(0); setPlaying(true);
-    } catch (requestError) { setError(readableApiError(requestError)); }
-    finally { setLoading(null); }
+      window.sessionStorage.setItem(LAB2_COMPARISON_SCENARIO_KEY, JSON.stringify(scenario));
+      router.push("/lab2/comparison");
+    } catch {
+      setError("The comparison scenario could not be saved in this browser.");
+    }
   }
 
   return (
@@ -123,7 +121,7 @@ export default function Lab2Dashboard() {
           <label>Solver<select value={algorithm} onChange={(event) => setAlgorithm(event.target.value as CSPAlgorithm)}>{algorithms.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
           <button className="lab2-primary" disabled={!scenario || loading !== null} onClick={solve}><Play size={15} /> Solve & simulate</button>
           <button className="lab2-secondary" disabled={!scenario || loading !== null} onClick={compare}><BrainCircuit size={15} /> Compare all solvers</button>
-          <p className="lab2-help">Generate once, then every comparison uses that exact incident and resource set.</p>
+          <p className="lab2-help">Opens a separate three-map comparison page using this exact frozen scenario.</p>
         </aside>
 
         <section className="lab2-main">
@@ -179,14 +177,6 @@ export default function Lab2Dashboard() {
       {scenario && <section className="lab2-panel fleet-stations-panel">
         <div className="fleet-panel-heading"><div><span className="eyebrow">Fleet and stations</span><h2>Resource readiness by dispatch center</h2></div><p>The highlighted station is dispatching the currently selected visualization step.</p></div>
         <div className="fleet-station-grid">{scenario.centers.map((center) => { const fleet = scenario.resources.filter((resource) => resource.center_id === center.id); const available = fleet.filter((resource) => resource.available).length; return <article key={center.id} className={currentAllocation?.center_id === center.id ? "active" : ""}><b>{fleetSymbols[center.center_type] ?? "🚨"}</b><div><strong>{center.name}</strong><span>{label(center.center_type)}</span></div><output>{available}<small> / {fleet.length} ready</small></output><div className="fleet-readiness"><i style={{ width: `${fleet.length ? available / fleet.length * 100 : 0}%` }} /></div></article>; })}</div>
-      </section>}
-
-      {comparison && <section className="lab2-panel lab2-comparison"><div><span className="eyebrow">Same-scenario benchmark</span><h2>Algorithm comparison</h2></div><div className="lab2-comparison-grid">{algorithms.map(({ value, label: name }) => { const item = comparison[value]; const effort = value === "local_search" ? item.metrics.steps : item.metrics.nodes_visited; return <article key={value}><header><strong>{name}</strong><span>{item.solution_found ? "SOLVED" : "PARTIAL"}</span></header><div className="comparison-card-metrics"><span><small>Runtime</small><b>{item.metrics.runtime_ms.toFixed(2)} ms</b></span><span><small>{value === "local_search" ? "Repair steps" : "Search nodes"}</small><b>{number(effort)}</b></span><span><small>Allocated</small><b>{item.requirements_allocated}/{item.requirements_total}</b></span><span><small>Conflicts</small><b>{item.metrics.conflicts_final}</b></span></div></article>; })}</div></section>}
-
-      {comparison && <section className="lab2-panel lab2-chart-matrix comparison-dashboard-priority">
-        <div><span className="eyebrow">Visual comparison dashboard</span><h2>Solver quality, efficiency, cost and outcome</h2><p>All values come from the same frozen incidents, resources, domains, roads and seed.</p></div>
-        <div className="lab2-table-scroll"><table><thead><tr><th>Algorithm</th><th>Solution</th><th>Allocated</th><th>Unallocated</th><th>Search / repair effort</th><th>BT / BJ / repairs</th><th>Conflicts</th><th>Runtime</th></tr></thead><tbody>{algorithms.map(({ value, label: name }) => { const item = comparison[value]; const effort = value === "local_search" ? item.metrics.steps : item.metrics.nodes_visited; const special = value === "backtracking" ? item.metrics.backtracks : value === "backjumping" ? item.metrics.backjumps : item.metrics.repairs; return <tr key={value}><td><strong>{name}</strong></td><td>{item.solution_found ? "Yes" : "No / partial"}</td><td>{item.requirements_allocated}</td><td>{item.requirements_unallocated}</td><td>{number(effort)}</td><td>{number(special)}</td><td>{item.metrics.conflicts_final}</td><td>{item.metrics.runtime_ms.toFixed(2)} ms</td></tr>; })}</tbody></table></div>
-        <Lab2ComparisonVisuals comparison={comparison} />
       </section>}
 
       {result && <section className="lab2-inspection-grid">

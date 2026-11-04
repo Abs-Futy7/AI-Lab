@@ -1319,9 +1319,10 @@ The dedicated `/lab2` page contains:
 - fleet readiness cards for every fixed dispatch station, synchronized with the active allocation step;
 - total incidents, CSP variables, resources, allocations, and violations;
 - solver-specific metrics and measured runtime;
-- a same-scenario comparison dashboard placed immediately after the benchmark cards;
+- a dedicated `/lab2/comparison` page opened by Compare All, keeping the main Lab-2 dashboard focused;
+- three separate solver maps showing Backtracking, CBJ, and Min-Conflicts allocations over identical incidents and centers;
 - a transparent per-run recommendation plus fastest, leanest-exact-search, and lowest-cost conclusions;
-- radar, runtime/effort scatter, operational cost/response scatter, allocation donuts, and a normalized exact-value heatmap;
+- radar, runtime/effort scatter, operational cost/response scatter, allocation donuts, and a green-and-white normalized exact-value heatmap;
 - derived allocation rate, pruning rate, cost per allocation, allocations per effort, throughput, and Min-Conflicts conflict-reduction calculations;
 - algorithm-specific search-flow diagrams and an axis-labeled Min-Conflicts history chart instead of empty trace panels;
 - expanded-node, runtime, weighted-cost, and route-distance graphs in the six-algorithm Lab-1 comparison window;

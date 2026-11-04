@@ -169,7 +169,7 @@ export default function Lab2ComparisonVisuals({ comparison }: { comparison: Reco
         <header><div><strong>Normalized metric heatmap</strong><span>Exact values plus a within-run 30–100 score</span></div><span className="chart-help">Darker = better</span></header>
         <div className="comparison-heatmap" role="table" aria-label="Normalized solver metric heatmap">
           <div className="heatmap-row heatmap-head" role="row"><span role="columnheader">Metric</span>{calculated.map((item) => <strong role="columnheader" key={item.key}>{item.short}<small>{item.name}</small></strong>)}</div>
-          {heatMetrics.map((metric) => <div className="heatmap-row" role="row" key={metric.label}><span role="rowheader"><b>{metric.label}</b><small>{metric.detail}</small></span>{metric.values.map((value, index) => { const score = metric.scores[index]; return <div role="cell" key={calculated[index].key} style={{ backgroundColor: `rgba(37, 99, 235, ${0.08 + score / 180})` }}><b>{metric.format(value)}</b><small>score {score}</small></div>; })}</div>)}
+          {heatMetrics.map((metric) => <div className="heatmap-row" role="row" key={metric.label}><span role="rowheader"><b>{metric.label}</b><small>{metric.detail}</small></span>{metric.values.map((value, index) => { const score = metric.scores[index]; return <div role="cell" key={calculated[index].key} style={{ backgroundColor: `rgba(22, 163, 74, ${0.04 + score / 210})` }}><b>{metric.format(value)}</b><small>score {score}</small></div>; })}</div>)}
         </div>
       </article>
       </div>

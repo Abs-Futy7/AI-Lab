@@ -792,10 +792,11 @@ Exact-search nodes and local-search repair steps are different work units; the U
 
 ### Comparison dashboard and derived calculations
 
-After **Compare all solvers**, the dashboard now appears immediately below the three summary cards so it cannot be missed during evaluation. All calculations use the three results returned for one frozen scenario; no solver receives regenerated incidents, resources, domains, routes, closures, or seed.
+After **Compare all solvers**, the application stores the already-generated frozen scenario in browser session storage and navigates to the dedicated `/lab2/comparison` page. The main Lab 2 page therefore stays focused on generation, one-solver playback, domain inspection, and allocation evidence. The comparison page submits the frozen scenario payload to the existing compare endpoint, so no solver receives regenerated incidents, resources, domains, routes, closures, or seed.
 
 The comparison includes:
 
+- three separate maps, one each for Backtracking, Conflict-Directed Backjumping, and Min-Conflicts, showing their complete allocation routes over identical centers and incidents;
 - an exact-value table for solution status, allocations, effort, solver-specific recovery events, conflicts, and runtime;
 - a per-run recommendation that prioritizes complete satisfaction, allocation rate, final conflicts, response time, dispatch cost, and finally runtime;
 - separate fastest-runtime, leanest-exact-search, and lowest-cost conclusions;
@@ -803,7 +804,7 @@ The comparison includes:
 - a runtime-versus-work scatter plot, with explicit notice that exact-search nodes and Min-Conflicts repair steps are different units;
 - an operational scatter plot comparing average response time with dispatch cost per allocation;
 - allocation/unallocation donuts;
-- a normalized heatmap containing exact values and within-run scores;
+- a green-and-white normalized heatmap containing exact values and within-run scores;
 - formula cards for each solver.
 
 The derived values are:
@@ -820,6 +821,8 @@ conflict_reduction    = (1 - final_conflicts / initial_conflicts) × 100
 `conflict_reduction` is shown only for Min-Conflicts because exact Backtracking and CBJ maintain consistent partial assignments instead of beginning with a complete conflicted assignment. `allocations_per_effort` is meaningful within a solver family; exact nodes and local repair steps must not be presented as identical operations. Runtime excludes route-domain preparation and browser animation.
 
 The recommendation is a transparent UI ranking for the current scenario, not a mathematical claim that one CSP algorithm is universally best. Backtracking and CBJ remain complete under the documented finite/no-limit assumptions; Min-Conflicts can be faster but cannot prove unsatisfiability.
+
+If `/lab2/comparison` is opened directly without a scenario in the current browser session, it does not invent data. It shows a return action asking the user to generate a scenario first. This protects the same-scenario comparison claim.
 
 ```text
 backend/app/
