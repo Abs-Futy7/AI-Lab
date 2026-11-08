@@ -7,21 +7,25 @@ Lab 2 implements the material in **CSE 4101 Lecture Slide 5: Constraint Satisfac
 ## Contents
 
 1. [Problem and slide alignment](#problem-and-slide-alignment)
-2. [CSP definitions and consistency methods](#csp-definitions-from-the-lecture)
-3. [Formal CSP formulation](#formal-csp-formulation)
-4. [Variables and domains in code](#variables-and-domains-in-code)
-5. [Constraints and constraint graph](#constraints-and-constraint-graph)
-6. [AC-3 constraint propagation](#ac-3-constraint-propagation)
-7. [MRV, Degree, and LCV](#mrv-degree-and-lcv)
-8. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
-9. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
-10. [Min-Conflicts local search](#min-conflicts-local-search)
-11. [Line-by-line code walkthrough](#line-by-line-implementation-walkthrough)
-12. [Worked emergency example](#worked-miniature-emergency-example)
-13. [Exact project pipeline](#exact-project-pipeline)
-14. [Metrics and source layout](#metrics-and-source-layout)
-15. [API, tests, solver comparison, and viva](#api-tests-and-viva)
-16. [Assumptions and limitations](#assumptions-and-limitations)
+2. [What happens when the project runs](#what-happens-when-the-project-runs)
+3. [Scenario, incidents, routes, response time, and cost](#scenario-incidents-routes-response-time-and-cost)
+4. [CSP definitions and consistency methods](#csp-definitions-from-the-lecture)
+5. [Formal CSP formulation](#formal-csp-formulation)
+6. [Variables and domains in code](#variables-and-domains-in-code)
+7. [Constraints and constraint graph](#constraints-and-constraint-graph)
+8. [AC-3 constraint propagation](#ac-3-constraint-propagation)
+9. [MRV, Degree, LCV, and the meaning of heuristic](#mrv-degree-and-lcv)
+10. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
+11. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
+12. [Min-Conflicts local search](#min-conflicts-local-search)
+13. [Which solver is better and when](#which-solver-is-better-and-when)
+14. [Function-by-function implementation map](#function-by-function-implementation-map)
+15. [Line-by-line code walkthrough](#line-by-line-implementation-walkthrough)
+16. [Worked emergency example](#worked-miniature-emergency-example)
+17. [Exact project pipeline](#exact-project-pipeline)
+18. [Metrics and source layout](#metrics-and-source-layout)
+19. [API, tests, solver comparison, and viva](#api-tests-and-viva)
+20. [Assumptions and limitations](#assumptions-and-limitations)
 
 ## Problem and slide alignment
 
@@ -47,6 +51,173 @@ Lab 2 reuses Lab 1's road layer only to determine candidate reachability, route 
 | Min-Conflicts | Seeded repair of a complete inconsistent assignment |
 
 The slide also discusses node, path, and general `k`-consistency. This project performs unary filtering and arc consistency. It does not claim a general path-consistency or `k`-consistency engine.
+
+## What happens when the project runs
+
+The complete user-to-result flow is:
+
+1. The user selects scale, deadline policy, road scenario, resource availability, and a deterministic seed.
+2. **Generate scenario** creates incidents and a simulated fleet once. The scenario receives a stable ID derived from the request.
+3. Every incident is converted into one or more requirement variables. One incident is not necessarily one CSP variable.
+4. For each variable, the backend starts with every physical resource of the required type.
+5. It removes unavailable, under-capacity, unreachable, late, and over-budget resources. This produces the real domain `D(Xi)`.
+6. Variables whose domains share a physical resource are connected in the constraint graph.
+7. AC-3 removes values that have no binary `Xi != Xj` support.
+8. A global matching check catches group shortages that binary AC-3 can miss.
+9. The selected solver assigns distinct resources: Backtracking, CBJ, or Min-Conflicts.
+10. The result converts each `variable -> resource_id` assignment into a route from that resource's fixed center to the incident.
+11. The API returns allocations, unallocated requirements, route coordinates, response times, costs, metrics, domain evidence, and solver traces.
+12. The frontend animates those returned routes. **Compare all solvers** clones the same prepared CSP three times so the comparison changes only the solver.
+
+The frontend does not manufacture an allocation. It visualizes the backend assignment and the route evidence stored for that assigned resource.
+
+### One incident versus one requirement
+
+An incident describes the emergency. A requirement describes one physical unit needed to respond. For example:
+
+```text
+Severe fire INC-014
+  -> INC-014_FIRE_UNIT_1 = one fire-unit requirement
+  -> INC-014_AMBULANCE_1 = one ambulance requirement
+```
+
+Therefore:
+
+```text
+number of CSP variables = sum of required resource counts over all incidents
+```
+
+Thirty incidents commonly produce more than thirty variables because severe fire, road-accident, and flood-rescue incidents add a second resource type. The top summary deliberately reports both **Incidents** and **CSP variables** so these quantities are not confused.
+
+## Scenario, incidents, routes, response time, and cost
+
+### Where incidents come from
+
+The incidents are deterministic simulated teaching data, not live calls and not a downloaded emergency dataset. `scenario_generator.py` uses `random.Random(seed)`. The same controls and seed reproduce the same incident types, locations, severities, fleet availability, capacities, and costs.
+
+Incident locations are sampled from real nodes in the bundled Central Dhaka directed road graph. To prevent the normal scenario from generating obviously isolated points, `_operational_incident_nodes()` first finds nodes reachable from every fixed resource center and samples from that common operational area.
+
+| Scale | Incident count | Base fleet before availability filtering |
+|---|---:|---:|
+| Small | 30 | 36 ambulances + 20 fire units + 20 rescue teams = 76 |
+| Medium | 100 | 115 + 60 + 60 = 235 |
+| Large | 300 | 345 + 180 + 180 = 705 |
+| Custom | User count | Uses the nearest preset fleet scale |
+
+The availability policy changes fleet size and individual availability:
+
+| Policy | Fleet multiplier | Simulated unavailable probability |
+|---|---:|---:|
+| High | `1.20` | `0.02` |
+| Normal | `1.00` | `0.08` |
+| Shortage | `0.55` | `0.18` |
+
+Incident types are sampled with documented weights: medical `0.34`, road accident `0.27`, fire `0.21`, and flood rescue `0.18`. Severity is from 1 to 5 with weights `8, 18, 30, 26, 18`; it is therefore simulated but not uniformly random.
+
+### How incident type becomes required resources
+
+| Incident | Base requirement | Additional requirement at severity 4 or 5 |
+|---|---|---|
+| Medical | 1 ambulance | None |
+| Fire | 1 fire unit | 1 ambulance |
+| Road accident | 1 ambulance | 1 rescue team |
+| Flood rescue | 1 rescue team | 1 ambulance |
+
+Required capacity is `max(1, severity)`. A severity-5 requirement therefore rejects a compatible vehicle whose capacity is below 5.
+
+The selected deadline policy supplies a base of 30, 60, or 120 minutes. The incident-specific deadline is:
+
+```text
+deadline_minutes = max(12, policy_base * (1.10 - 0.05 * severity))
+```
+
+Higher severity produces a moderately tighter deadline. The simulated per-incident budget is:
+
+```text
+budget = 2200 + 900 * severity + random value in [0, 1400]
+```
+
+### Which route is used
+
+Lab 2 does not draw a straight line. For each compatible center/incident pair it calls the Lab 1 road layer and runs A* on the frozen directed road graph. For candidate preparation, route search is configured as distance-only:
+
+```python
+distance_weights = CostWeights(
+    distance=1.0,
+    traffic=0.0,
+    condition=0.0,
+    risk=0.0,
+)
+```
+
+This means the selected candidate geometry is the shortest traversable road-distance route under the chosen closure scenario. Normal, some-blocked, and heavy-disruption map respectively to the Lab 1 normal, flood, and combined-emergency road scenarios. Closed edges cannot be used.
+
+The A* routing subproblem uses the project's admissible ALT landmark lower bound internally. That A* heuristic finds a road route efficiently; it is separate from the CSP assignment heuristics described later.
+
+All resources stationed at the same center share the same start coordinate. The backend therefore caches a route by `(center_id, incident_id)`. It does **not** run an identical A* search once for every ambulance ID. With two centers for each resource type, an ordinary single-type incident needs at most two distinct center-to-incident route calculations; a severe two-type incident can need up to four. Physical resource IDs remain separate domain values because availability, capacity, base dispatch cost, and uniqueness can differ even when route geometry is shared.
+
+### How response time is calculated
+
+The system starts from an educational base speed of 25 km/h and accumulates time edge by edge:
+
+```text
+edge_time_minutes = distance_m / (25000 / 60)
+                    * (1 + 1.5 * traffic + 0.5 * road_condition)
+
+route_response_time = sum(edge_time_minutes)
+```
+
+Traffic and condition therefore affect response time and can cause deadline rejection even though candidate route geometry is selected by shortest traversable distance. The displayed average response is:
+
+```text
+average_response_time = sum(all allocated response times) / allocated count
+```
+
+This is an estimate for the experiment, not a promise of real emergency arrival time.
+
+### How cost is calculated
+
+Each generated resource receives a base dispatch cost with a seeded `0.90` to `1.15` multiplier:
+
+| Resource type | Base dispatch cost |
+|---|---:|
+| Ambulance | 900 |
+| Fire unit | 1450 |
+| Rescue team | 1150 |
+
+For a specific candidate:
+
+```text
+estimated_candidate_cost = resource.dispatch_cost + 45 * route_distance_km
+```
+
+The candidate is removed if this exceeds the incident budget. For a returned allocation:
+
+```text
+total_dispatch_cost = sum(estimated_candidate_cost for every allocated requirement)
+cost_per_allocation = total_dispatch_cost / allocated requirements
+```
+
+Cost has three precise roles:
+
+1. **hard feasibility:** an over-budget candidate is removed;
+2. **reporting/comparison:** total cost and cost per allocation are displayed;
+3. **not a global objective:** the solver does not minimize the sum of all costs.
+
+LCV first protects neighboring domain flexibility, then uses travel time—not dispatch cost—as a tie-break. Consequently, a valid solution can be more expensive than another valid solution. Turning “find any complete consistent assignment” into “find the cheapest complete consistent assignment” would require a Constraint Optimization Problem method such as branch-and-bound or weighted CSP search.
+
+### How an incident is considered responded to
+
+An incident requirement is responded to only when its CSP variable receives a unique candidate resource that survived every unary filter. The returned allocation contains:
+
+- the requirement and incident IDs;
+- selected resource and center IDs;
+- source and destination coordinates;
+- complete road-route coordinates;
+- road distance and estimated response time;
+- estimated dispatch cost and deadline.
+
+If one incident requires two resource types, both variables must be allocated for the full CSP to be complete. If one cannot be assigned, the result remains `partial_or_unsatisfied`; the independently feasible route may still be returned and animated as a partial operational response.
 
 ## CSP definitions from the lecture
 
@@ -391,6 +562,95 @@ for step in range(max_steps):
 `score(value)` minimizes duplicate-resource neighbor conflicts, then travel time, then ID. A seeded pseudo-random generator chooses the conflicted variable, making repeated classroom demonstrations reproducible.
 
 Min-Conflicts is incomplete. Reaching `max_steps` means this run failed to find a solution; it does not prove unsatisfiability.
+
+## Which solver is better and when
+
+There is no universal winner. “Better” must name the criterion: completeness, runtime, search effort, response quality, cost, or explanatory trace.
+
+| Situation | Usually the best choice | Why | Important caution |
+|---|---|---|---|
+| Small or medium feasible classroom case | Backtracking + FC | Simple, deterministic, complete, and easy to defend line by line | Can revisit many chronological branches in a hard instance |
+| Need proof-quality exact search behavior | Backtracking or CBJ | Both systematically search the finite problem | Runtime may grow exponentially |
+| Deep failure caused by an older assignment | CBJ | Conflict sets can skip irrelevant intervening variables | Bookkeeping may cost more when useful jumps are rare |
+| Easy problem with strong MRV/LCV ordering | Backtracking | Often reaches a solution directly without CBJ overhead | This advantage is instance-dependent |
+| Large, dense, satisfiable allocation with a good solution basin | Min-Conflicts | Keeps one complete assignment and repairs conflicts with little recursive memory | Incomplete; can plateau or hit the step limit |
+| Need to prove unsatisfiable | Backtracking or CBJ | Exhaustive exact search can establish failure under the finite model | Min-Conflicts failure is not proof |
+| Need a visible explanation of the main conflicting decisions | CBJ | Its trace identifies failed variable, conflict set, skipped variables, and jump target | A trace may be empty on an easy run with no real backjump |
+| Need reproducible fast repair demonstration | Min-Conflicts | Seed controls conflicted-variable choice; conflict history is visual | Different seeds can produce different repair paths |
+
+### When ordinary Backtracking can beat CBJ
+
+Backtracking can be faster when MRV, Degree, LCV, AC-3, and Forward Checking make the first few choices successful. In that case there is little or nothing to jump over, so CBJ performs extra conflict-set construction without gaining a shorter search. Backtracking is also easier to explain because every failure returns exactly one level.
+
+### When CBJ can beat ordinary Backtracking
+
+Suppose decisions `A, B, C, D` have been made and a failure at `E` is caused only by `A` and `B`. Chronological Backtracking may reconsider `D` and `C`, although neither can fix the failure. CBJ propagates `{A, B}`, skips `D` and `C`, and returns directly to the most recent relevant culprit. It is especially useful when the constraint graph has independent regions or long stretches of irrelevant decisions.
+
+### When Min-Conflicts can beat both exact solvers
+
+Min-Conflicts is attractive when the instance is large, a solution exists, and most conflicts can be repaired locally. It avoids building an exponential recursive tree and stores one complete assignment. It can therefore reach zero conflicts in very few repair steps. However, a locally best move can leave the solver on a plateau, and exhausting `max_steps` cannot distinguish “no solution” from “this run did not find one.”
+
+### What the UI recommendation means
+
+The comparison page first prefers a complete allocation, then higher allocation rate, fewer final conflicts, better response/cost quality, and finally runtime. It also reports separate fastest, leanest exact-search, and lowest-cost labels. This avoids claiming that the algorithm with the smallest millisecond value is automatically best.
+
+The three original solver maps remain separate. The bottom difference map then hides common assignments and shows only variables on which the selected resource differs or a solver leaves the requirement unallocated. It explains **where** the final solver decisions differ; it does not change or rerun any solver.
+
+## Function-by-function implementation map
+
+The following table connects the project behavior to the actual function responsible for it.
+
+| File and function | Responsibility | Why it exists |
+|---|---|---|
+| `emergency/scenario_generator.py::_operational_incident_nodes` | Finds road nodes reachable from every fixed center | Keeps normal generated incidents inside a shared operational area |
+| `scenario_generator.py::_resource_counts` | Applies scale and availability multiplier | Produces controllable normal/high/shortage experiments |
+| `scenario_generator.py::_make_resources` | Creates resource IDs, center, availability, capacity, and dispatch cost | Builds the finite value pool used by domains |
+| `scenario_generator.py::_make_incidents` | Samples node, type, severity, requirements, deadline, capacity, and budget | Builds reproducible CSP demand from one seed |
+| `csp/domains.py::_variables` | Expands each incident requirement count into named slots | One incident may require multiple simultaneous resources |
+| `routing_service.py::prepare_lab2_road_graph` | Applies the selected Lab 1 road scenario | Makes closures and disruptions part of candidate feasibility |
+| `routing_service.py::calculate_lab2_candidate_route` | Runs distance-based A*, returns route geometry, distance, and traffic-adjusted time | Supplies real road evidence for each candidate |
+| `csp/domains.py::build_problem` | Filters unary constraints, creates candidate metadata and the sparse neighbor graph | Converts emergency data into `(X, D, C)` |
+| `csp/constraints.py::different_resources` | Tests `resourceA != resourceB` | Implements pairwise `Alldiff` and counts checks |
+| `constraints.py::assignment_conflicts` | Finds already assigned variables using the same resource | Rejects exact-search conflicts and identifies CBJ culprits |
+| `constraints.py::total_conflicts` | Counts duplicate-resource edges in a complete assignment | Supplies the Min-Conflicts objective |
+| `csp/ac3.py::revise` | Removes `Xi` values with no supporting different value in `Xj` | Implements the lecture's `REVISE` operation |
+| `ac3.py::enforce_arc_consistency` | Queues arcs and propagates revisions | Performs AC-3 preprocessing |
+| `csp/heuristics.py::select_unassigned_variable` | MRV, then Degree, severity, stable ID | Chooses the next exact-search variable fail-first |
+| `heuristics.py::order_domain_values` | LCV, then response time, then ID | Preserves flexibility when trying resources |
+| `csp/backtracking.py::solve_backtracking` | Recursive assignment, Forward Checking, reversible domain restoration | Provides the standard complete exact solver |
+| `csp/backjumping.py::solve_backjumping` | Builds/propagates conflict sets and records non-chronological jumps | Skips decisions unrelated to a deeper failure |
+| `csp/local_search.py::solve_min_conflicts` | Creates a complete assignment and repeatedly repairs duplicate-resource conflicts | Provides fast, incomplete local search |
+| `lab2_service.py::_maximum_matchable_variables` | Finds a deterministic maximum-cardinality distinct-resource subset | Handles Hall/pigeonhole shortages binary AC-3 can miss |
+| `lab2_service.py::_solve_problem` | Runs AC-3, shortage handling, and selected solver | Keeps all algorithms on one consistent pipeline |
+| `lab2_service.py::_result_payload` | Validates uniqueness and converts assignments into allocations/unallocated evidence | Produces the exact API object visualized by the frontend |
+| `lab2_service.py::compare` | Clones one base CSP and runs all three solvers | Guarantees fair same-scenario comparison |
+
+### What “heuristic” means in this project
+
+There is no single CSP formula such as `h(n) = distance to goal`. CSP search has no geographic goal node. Instead it uses ordering heuristics:
+
+- **MRV / MCV:** choose the variable with the fewest legal values;
+- **Degree:** when MRV ties, choose the variable constraining the most unassigned neighbors;
+- **severity:** project-specific tie-break only after MRV and Degree;
+- **LCV:** try the value that removes the fewest choices from neighbors;
+- **Min-Conflicts score:** minimize duplicate-resource conflicts, then response time.
+
+The road A* inside domain construction separately uses an admissible ALT lower bound. A* decides a candidate's road path; the CSP heuristics decide which candidate resource ID should be assigned. Mixing these two meanings of heuristic would incorrectly describe the architecture.
+
+### What the “main conflict” is
+
+The core binary conflict is **double allocation**: two simultaneous requirement variables choose the same physical resource ID. For example:
+
+```text
+INC-004_AMBULANCE_1 = AMB007
+INC-019_AMBULANCE_1 = AMB007   <- conflict
+```
+
+Unary failures such as unavailable, unreachable, too slow, under-capacity, or over-budget are removed before search and therefore never become legal assigned values. Among the surviving candidates, the main solver conflict is `Xi == Xj` across a constraint-graph edge.
+
+- Backtracking rejects the conflicting value and later returns one level if all values fail.
+- CBJ records which assigned variables own the conflicting values and jumps to a responsible culprit.
+- Min-Conflicts permits a complete conflicted state temporarily, then changes one conflicted variable to reduce the number of duplicate-resource edges.
 
 ## Line-by-line implementation walkthrough
 
@@ -973,6 +1233,122 @@ Preprocessing is shared. AC-3 is not counted as a fourth allocation solver becau
 **Could MAC be added?** Yes. After assigning `Xi=v`, temporarily reduce `D(Xi)` to `{v}`, enqueue affected arcs, run AC-3, recurse if consistent, and restore all domain reductions on return. It would provide stronger inference at greater per-node cost.
 
 **Why not implement AC-1 and AC-2 too?** They enforce the same arc-consistency property using different revision schedules. AC-3 is the clearest standard choice for this project; adding the older schedules would mainly demonstrate performance differences.
+
+### Examiner-ready practical Banglish Q&A
+
+**Q: Tomar Lab 2 task-ta ek line-e ki?**
+A: Simultaneous Dhaka emergency incident-er prottek resource requirement-er jonno ekta feasible, unique physical ambulance/fire unit/rescue team assign kora. Eta route-finding na; eta `(X, D, C)` resource-allocation CSP. Route use kori candidate feasible kina prove korte.
+
+**Q: Incident gula kotha theke niyecho? Real data?**
+A: Na, incident gula seeded simulated teaching data. Location bundled Central Dhaka road graph-er real reachable node theke nei, kintu emergency type, severity, deadline, budget, fleet availability ar capacity simulation. Same controls plus same seed dile same scenario reproduce hoy.
+
+**Q: Koyta incident generate hoy?**
+A: Small-e 30, medium-e 100, large-e 300; custom-e user count. Kintu CSP variable count incident count-er cheye beshi hote pare, karon severe fire/accident/flood incident second resource type chaite pare.
+
+**Q: Ekta incident theke koyta variable hoy?**
+A: `sum(required_resources.values())`. Normal medical hole usually one ambulance variable. Severe fire hole one fire-unit variable plus one ambulance variable. Prottek slot independent CSP variable.
+
+**Q: Incident type-er probability ki equal?**
+A: Na. Medical 0.34, road accident 0.27, fire 0.21, flood rescue 0.18. Severity-o uniform na; weighted 1-to-5 distribution use kori. Ei values configuration, solver logic na.
+
+**Q: Resource center koyta?**
+A: Six fixed educational center: two ambulance hospitals, two fire stations, two rescue bases. Physical resource onek, but same type-er resources oi two relevant center-er moddhe round-robin stationed.
+
+**Q: Route kon algorithm diye ber koro?**
+A: Lab 1-er A* routing layer reuse kori. Lab 2 candidate geometry distance-only shortest traversable directed road route. A* internally admissible ALT landmark lower bound use kore. Closed road traverse korte pare na.
+
+**Q: Tahole CSP heuristic ar A* heuristic ki same?**
+A: Na. A* heuristic road path efficiently ber kore. CSP heuristic holo MRV/MCV, Degree, severity tie-break, and LCV; egula variable/value ordering kore. Min-Conflicts-er score duplicate-resource conflict minimize kore. Geographic `h(n)` diye resource allocation kori na.
+
+**Q: Prottek ambulance-er jonno alada A* chalao?**
+A: Same center-er vehicle-gular source coordinate same, tai `(center_id, incident_id)` diye route cache kori. Same geometry repeatedly calculate kori na. Tobe resource ID alada domain value, karon availability, capacity, base cost, and uniqueness alada hote pare.
+
+**Q: Traffic route-ta change kore naki response time change kore?**
+A: Current Lab 2 candidate route shortest traversable distance diye select hoy. Traffic and road condition edge-wise response-time estimate baray; deadline exceed korle candidate domain theke remove hoy. Closure directly route geometry change korte pare.
+
+**Q: Response time formula ki?**
+A: Base speed 25 km/h. Prottek edge-e `distance / base_speed * (1 + 1.5*traffic + 0.5*condition)`, tarpor shob edge time sum kori. Eta educational estimate, real ETA na.
+
+**Q: Cost kivabe calculate koro?**
+A: `estimated_cost = resource.dispatch_cost + 45 * distance_km`. Ambulance/fire/rescue-er base dispatch cost respectively 900/1450/1150, tar sathe seeded 0.90-to-1.15 multiplier. Candidate incident budget cross korle domain theke remove.
+
+**Q: Solver ki minimum cost solution guarantee kore?**
+A: Na. Eta satisfaction CSP: complete consistent allocation khuje. Cost budget-er hard filter and comparison/reporting metric. Global minimum total cost chaile branch-and-bound ba weighted CSP/constraint optimization add korte hobe.
+
+**Q: LCV keno cheapest resource first ney na?**
+A: LCV-r purpose neighbor-der maximum flexibility preserve kora. Tai first key holo value-ta koyta remaining neighbor domain-e ache; impact tie hole shorter response time, tarpor stable resource ID. Cheapest-global solution LCV-r claim na.
+
+**Q: Main conflict ta ki?**
+A: Same physical resource ID dui simultaneous requirement-e assign hoye jawa. Constraint graph-e connected `Xi` and `Xj`-er jonno hard rule `Xi != Xj`. Unavailable/late/over-budget gula search conflict na, karon domain building-e agei remove hoy.
+
+**Q: Constraint graph-e shob variable-ke connect koro na keno?**
+A: Duita variable-er domain disjoint hole same physical resource choose korar chance nai. Tai only overlapping domain hole edge add kori. Correctness same thake, graph sparse hoy, Degree/AC-3/solver work kom hoy.
+
+**Q: AC-3 exactly ki kore?**
+A: Prottek directed arc `(Xi, Xj)` check kore. `D(Xi)`-er kono value-er jonno `D(Xj)`-e different supporting value na thakle oi value remove kore. Domain change hole affected arc queue-te abar add hoy. Empty domain full CSP failure indicate kore.
+
+**Q: AC-3 successful mane solution peye gecho?**
+A: Na. Arc consistency local property. Every value-er local support thakleo globally shob variable-er distinct value nao thakte pare. Tai exact solver and global matching check dorkar.
+
+**Q: AC-3 ten requirement and nine resource shortage dhorte pare na keno?**
+A: Pairwise domain-e prottek value-er different support thakte pare, but group collectively enough distinct resource pabe na—eta Hall/pigeonhole problem. Tai deterministic maximum-cardinality bipartite matching pass add kora ache.
+
+**Q: MRV/MCV ki?**
+A: Remaining legal value shobcheye kom jar, take age select kori—fail first. Lecture-e eta MCV/Most Constrained Variable-o bola hoy. Impossible branch hole early detect hoy.
+
+**Q: Degree heuristic kobe use hoy?**
+A: MRV tie hole. Still-unassigned neighbor beshi jar, take select kori, karon se remaining problem-ke beshi constrain kore. MRV-r age Degree use kori na.
+
+**Q: Severity ki lecture heuristic replace kore?**
+A: Na. Order holo MRV, then Degree, then higher severity, then stable ID. Severity only domain-specific third tie-break; lecture ordering preserve kora hoy.
+
+**Q: Backtracking kivabe kaj kore?**
+A: MRV diye variable ney, LCV diye resource try kore, conflict-free hole assign kore. Forward Checking assigned resource-ta unassigned neighbor domain theke temporary remove kore. Dead end hole shob removal exact restore kore previous level-e fire onno value try kore.
+
+**Q: Backtracking kokhon best hote pare?**
+A: Easy/medium feasible case-e jodi AC-3, MRV, LCV, Forward Checking first direction-ei solution-er kache niye jay. Tokhon conflict-set overhead nai, deterministic and complete, explanation-o easiest.
+
+**Q: CBJ Backtracking theke alada kothay?**
+A: Ordinary Backtracking last decision-e fire. CBJ failure-er responsible assigned variable-gular conflict set propagate kore, irrelevant middle decisions skip kore most recent relevant culprit-e jump kore.
+
+**Q: CBJ kokhon better?**
+A: Deep dead end jodi onek purono decision-er karone hoy and majher decisions irrelevant hoy. Tokhon non-chronological jump recursive nodes bachte pare. Easy run-e useful jump na hole bookkeeping-er jonno ordinary Backtracking faster hote pare.
+
+**Q: CBJ trace empty hole implementation wrong?**
+A: Necessarily na. Scenario easy hole solution first branch-e pawa jete pare, ba shob failure chronological neighbor-er sathei related hote pare. Actual non-chronological skip holei meaningful jump trace record hoy.
+
+**Q: Min-Conflicts kivabe kaj kore?**
+A: First-e complete but possibly conflicting assignment banay. Tarpor seeded random way-te ekta conflicted variable ney and conflict count minimum kore emon resource assign kore; tie hole response time and ID use kore. Zero conflict hole solution.
+
+**Q: Min-Conflicts kokhon better?**
+A: Large satisfiable instance-e jokhon conflict local repair diye quickly fix hoy. Recursive tree store kore na, tai fast hote pare. Kintu plateau/cycle/step-limit ache, tai incomplete and unsatisfiable prove korte pare na.
+
+**Q: Min-Conflicts max steps shesh hole ki problem unsatisfiable?**
+A: Bola jabe na. Sudhu ei seeded run allowed steps-er moddhe zero-conflict state pay nai. Unsatisfiability prove korte exact exhaustive method dorkar.
+
+**Q: Partial result keno map-e show koro?**
+A: Full CSP unsatisfied holeo kichu independent requirement feasible hote pare. Operational teaching-er jonno largest matchable feasible subset solve and animate kori, but API status clearly `partial_or_unsatisfied`; full solution bole claim kori na.
+
+**Q: Compare All fair kivabe?**
+A: One frozen scenario theke one base CSP build hoy, tarpor each solver-er jonno clone. Same incidents, resources, route candidates, closures, domains, deadline, budget, and seed. Mutable domains/metrics share hoy na.
+
+**Q: Three solver map-er route different keno?**
+A: Multiple resources feasible hole algorithm-er ordering/repair path different physical resource choose korte pare. Different center hole route geometry-o different hoy. Same final resource choose korle route same hobe because candidate evidence frozen.
+
+**Q: Bottom difference map ki dekhay?**
+A: Je requirement-e three solver same resource choose kore, seta hide kore clutter komay. Resource ID different ba kono solver unallocated hole BT blue solid, CBJ orange dashed, MC purple dotted route overlay kore. Eta result explain kore; solver change kore na.
+
+**Q: Kon solver best bolbo?**
+A: Universal best na. Complete solution first priority. Tarpor allocation rate/conflicts, operational response and cost, finally runtime. Easy exact case-e Backtracking, dependency-heavy failure-e CBJ, large satisfiable repair-friendly case-e Min-Conflicts advantage pete pare. Current run-er measured evidence dekhe answer dite hobe.
+
+**Q: Runtime eto kom keno, map animation eto long keno?**
+A: `runtime_ms` only solver search/repair loop. Scenario generation, candidate A* route preparation, AC-3 preprocessing, network request, map rendering, and deliberate playback animation same metric-er part na. Animation time algorithm computation time bole present kori na.
+
+**Q: Sir jodi jiggesh kore “tumi ki optimize korcho?”**
+A: Primary objective complete consistent satisfaction. MRV/Degree/LCV search effort komanor heuristic, response time value tie-break, budget hard constraint. Dashboard cost/response compare kore, but global minimum-cost assignment guarantee claim kori na.
+
+**Q: Ei system real emergency dispatch-e use kora jabe?**
+A: Na. Eta educational simulation. Incident, availability, traffic, capacity, deadline, and cost simulated; real safety-critical dispatch-er validation, live feeds, governance, and reliability requirement fulfill kore na.
 
 ## Assumptions and limitations
 
