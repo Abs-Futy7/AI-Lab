@@ -14,6 +14,7 @@ import { ExpandedNodesChart } from "./ExpandedNodesChart";
 import { MetricsPanel } from "./MetricsPanel";
 import { SimulationControls } from "./SimulationControls";
 import { compareRoutes, findRoute, readableApiError } from "@/lib/api";
+import { readRoutingWorkspace, saveRoutingWorkspace } from "@/lib/routing-workspace";
 import type { Algorithm, CompareResponse, Coordinates, CostWeights, CustomRoadClosure, LayerVisibility, MapPickMode, NetworkScale, Scenario, SearchResult } from "@/types/routing";
 
 const RouteMap = dynamic(() => import("./RouteMap"), {
@@ -45,6 +46,26 @@ export default function RoutingDashboard() {
   const expandedCount = result?.expanded_nodes.length ?? 0;
   const pathCount = result?.path.length ?? 0;
   const playbackTotal = expandedCount + pathCount;
+
+  useEffect(() => {
+    const saved = readRoutingWorkspace();
+    if (!saved) return;
+    setSource(saved.source);
+    setDestination(saved.destination);
+    setAlgorithm(saved.algorithm);
+    setScenario(saved.scenario);
+    setNetworkScale(saved.networkScale);
+    setWeights(saved.weights);
+    setLayers(saved.layers);
+    setCustomClosures(saved.customClosures);
+    setClosureBothDirections(saved.closureBothDirections);
+    setResult(saved.result);
+    setComparison(saved.comparison);
+    const savedTotal = (saved.result?.expanded_nodes.length ?? 0) + (saved.result?.path.length ?? 0);
+    setPlaybackStep(Math.min(saved.playbackStep, savedTotal));
+    setPlaybackBatch(saved.playbackBatch);
+    setPlaying(false);
+  }, []);
 
   useEffect(() => {
     if (!playing || !result) return;
@@ -120,6 +141,23 @@ export default function RoutingDashboard() {
   }
 
   function openSimulationWindow() {
+    saveRoutingWorkspace({
+      version: 1,
+      source,
+      destination,
+      algorithm,
+      scenario,
+      networkScale,
+      weights,
+      layers,
+      customClosures,
+      closureBothDirections,
+      result,
+      comparison,
+      playbackStep,
+      playbackBatch,
+      savedAt: Date.now(),
+    });
     const query = new URLSearchParams({
       source_lat: String(source.lat),
       source_lon: String(source.lon),
