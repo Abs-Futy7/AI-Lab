@@ -27,6 +27,8 @@ Before the six-way `/simulation` window opens, the browser stores the current La
 
 Visualizes emergency-resource allocation as a CSP. It provides Backtracking, Conflict-Directed Backjumping, and Min-Conflicts; AC-3/MRV/Degree/LCV inspection; compact symbol-based emergency markers; closer map framing; actual road-route allocations; partial playback when blocked roads make only some requirements infeasible; fleet/station readiness; and a previous/next allocation-step visualizer. Compare All opens `/lab2/comparison`, where three full-width solver maps appear before recommendation cards, exact calculations, radar and operational cost/response plots, allocation donuts, and a green-and-white normalized heatmap.
 
+Before Compare All opens `/lab2/comparison`, the current Lab 2 workspace is saved in the tab session. **Back to Lab 2** restores the scenario controls, frozen incidents and resources, selected solver, solved allocation, inspector selection, and playback step rather than creating a new scenario workspace.
+
 ## Local development
 
 Start the FastAPI backend first, then run:

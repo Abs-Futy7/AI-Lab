@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, Ambulance, BrainCircuit, MapPinned, Play, RefreshCw, ShieldAlert } from "lucide-react";
 
 import { generateLab2Scenario, readableApiError, solveLab2Scenario } from "@/lib/api";
-import { LAB2_COMPARISON_SCENARIO_KEY } from "@/lib/lab2-comparison";
+import { LAB2_COMPARISON_SCENARIO_KEY, readLab2Workspace, saveLab2Workspace } from "@/lib/lab2-comparison";
 import type { CSPAlgorithm, DomainInspection, Lab2GenerateRequest, Lab2Result, Lab2Scenario } from "@/types/lab2";
 import Lab2SearchVisual from "./Lab2SearchVisual";
 
@@ -45,6 +45,19 @@ export default function Lab2Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [playStep, setPlayStep] = useState(0);
   const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const saved = readLab2Workspace();
+    if (!saved) return;
+    setConfig(saved.config);
+    setAlgorithm(saved.algorithm);
+    setScenario(saved.scenario);
+    setResult(saved.result);
+    const selectedExists = saved.result?.domain_inspection.some((item) => item.variable === saved.selectedVariable);
+    setSelectedVariable(selectedExists ? saved.selectedVariable : saved.result?.domain_inspection[0]?.variable ?? "");
+    setPlayStep(Math.min(saved.playStep, saved.result?.allocations.length ?? 0));
+    setPlaying(false);
+  }, []);
 
   useEffect(() => {
     if (!playing || !result) return;
@@ -89,6 +102,20 @@ export default function Lab2Dashboard() {
     if (!scenario) return;
     try {
       window.sessionStorage.setItem(LAB2_COMPARISON_SCENARIO_KEY, JSON.stringify(scenario));
+      const saved = saveLab2Workspace({
+        version: 1,
+        config,
+        algorithm,
+        scenario,
+        result,
+        selectedVariable,
+        playStep,
+        savedAt: Date.now(),
+      });
+      if (saved === "unavailable") {
+        setError("The Lab 2 workspace could not be saved in this browser.");
+        return;
+      }
       router.push("/lab2/comparison");
     } catch {
       setError("The comparison scenario could not be saved in this browser.");

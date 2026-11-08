@@ -823,6 +823,8 @@ The recommendation is a transparent UI ranking for the current scenario, not a m
 
 If `/lab2/comparison` is opened directly without a scenario in the current browser session, it does not invent data. It shows a return action asking the user to generate a scenario first. This protects the same-scenario comparison claim.
 
+The same navigation also saves the complete Lab 2 dashboard workspace in session storage. Returning through **Back to Lab 2** restores the exact scenario configuration, generated incidents/resources, chosen solver, current solver result, selected domain-inspector variable, and allocation playback step. If an unusually large diagnostic trace exceeds browser quota, storage falls back first to the playable allocation/map result and finally to the frozen scenario rather than silently opening an unrelated new workspace.
+
 ### Resource-shortage comparison behavior
 
 AC-3 on pairwise `resourceA != resourceB` constraints cannot by itself detect every global pigeonhole shortage. For example, ten ambulance requirements may each have a nonempty domain while their combined domains contain only nine distinct ambulances. Before running the selected solver, the backend therefore performs a deterministic maximum-cardinality bipartite matching check. When the complete problem is impossible, it retains the largest matchable requirement subset—prioritizing higher-severity and smaller-domain requirements—and runs Backtracking, CBJ, and Min-Conflicts on that shared subset. The comparison consequently contains real search/repair effort and playable partial allocations instead of misleading zero-runtime results.

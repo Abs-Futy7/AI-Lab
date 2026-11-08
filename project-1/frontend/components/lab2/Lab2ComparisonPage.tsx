@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, BrainCircuit, LoaderCircle, MapPinned, ShieldAlert } from "lucide-react";
 
 import { compareLab2Scenario, readableApiError } from "@/lib/api";
-import { LAB2_COMPARISON_SCENARIO_KEY } from "@/lib/lab2-comparison";
+import { isLab2Scenario, LAB2_COMPARISON_SCENARIO_KEY } from "@/lib/lab2-comparison";
 import type { CSPAlgorithm, Lab2Result, Lab2Scenario } from "@/types/lab2";
 import Lab2ComparisonVisuals from "./Lab2ComparisonVisuals";
 
@@ -25,15 +25,6 @@ function number(value: number) {
   return new Intl.NumberFormat().format(value);
 }
 
-function isScenario(value: unknown): value is Lab2Scenario {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<Lab2Scenario>;
-  return typeof candidate.scenario_id === "string"
-    && Array.isArray(candidate.incidents)
-    && Array.isArray(candidate.resources)
-    && Array.isArray(candidate.centers);
-}
-
 export default function Lab2ComparisonPage() {
   const [scenario, setScenario] = useState<Lab2Scenario | null>(null);
   const [comparison, setComparison] = useState<Record<CSPAlgorithm, Lab2Result> | null>(null);
@@ -47,7 +38,7 @@ export default function Lab2ComparisonPage() {
     try {
       const saved = window.sessionStorage.getItem(LAB2_COMPARISON_SCENARIO_KEY);
       const parsed: unknown = saved ? JSON.parse(saved) : null;
-      if (!isScenario(parsed)) {
+      if (!isLab2Scenario(parsed)) {
         setError("No frozen scenario is available. Return to Lab 2, generate a scenario, then choose Compare all solvers.");
         setLoading(false);
         return;
