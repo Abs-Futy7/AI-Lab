@@ -87,14 +87,6 @@ export default function Lab2ComparisonVisuals({ comparison }: { comparison: Reco
     { metric: "Conflict control", ...Object.fromEntries(solvers.map((solver, index) => [solver.short, conflictControl[index]])) },
     { metric: "Domain pruning", ...Object.fromEntries(solvers.map((solver, index) => [solver.short, Math.round(results[index].metrics.domain_values_pruned / Math.max(1, results[index].metrics.initial_domain_values) * 100)])) },
   ];
-  const scatterData = solvers.map((solver, index) => ({
-    name: solver.short,
-    fullName: solver.name,
-    effort: effort(results[index]),
-    runtime: Number(results[index].metrics.runtime_ms.toFixed(3)),
-    allocated: results[index].requirements_allocated,
-    color: solver.color,
-  }));
   const operationalData = calculated.map((item) => ({
     name: item.short,
     fullName: item.name,
@@ -137,22 +129,6 @@ export default function Lab2ComparisonVisuals({ comparison }: { comparison: Reco
               <Legend wrapperStyle={{ fontSize: 12, fontWeight: 700 }} />
               <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12 }} />
             </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      </article>
-
-      <article className="lab2-rich-chart">
-        <header><div><strong>Runtime versus search effort</strong><span>Lower-left indicates less work and less time</span></div><span className="chart-help">Bubble size = allocated</span></header>
-        <div className="lab2-rich-canvas">
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 28, right: 34, bottom: 28, left: 24 }}>
-              <CartesianGrid strokeDasharray="4 4" stroke="#dbe4ee" />
-              <XAxis type="number" dataKey="effort" name="Search / repair effort" tick={{ fill: "#475569", fontSize: 11 }} label={{ value: "Search nodes / repair steps", position: "insideBottom", offset: -18, fill: "#475569", fontSize: 11 }} />
-              <YAxis type="number" dataKey="runtime" name="Runtime" unit=" ms" tick={{ fill: "#475569", fontSize: 11 }} label={{ value: "Runtime (ms)", angle: -90, position: "insideLeft", offset: -8, fill: "#475569", fontSize: 11 }} />
-              <ZAxis type="number" dataKey="allocated" range={[110, 260]} name="Allocated requirements" />
-              <Tooltip cursor={{ strokeDasharray: "4 4" }} contentStyle={{ borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12 }} />
-              {scatterData.map((point) => <Scatter key={point.name} name={point.fullName} data={[point]} fill={point.color}><LabelList dataKey="name" position="top" fill="#1e293b" fontSize={12} fontWeight={850} /></Scatter>)}
-            </ScatterChart>
           </ResponsiveContainer>
         </div>
       </article>

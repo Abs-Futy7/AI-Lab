@@ -62,9 +62,13 @@ def test_ac3_detects_empty_domain_unsatisfiable():
     assert any(not values for values in item.domains.values())
 
 
-def test_mrv_uses_severity_then_degree_tie_breakers():
-    item = problem({"LOW": ["R1"], "HIGH": ["R2"]}, {"LOW": 1, "HIGH": 5})
-    assert select_unassigned_variable(item, {}) == "HIGH"
+def test_mrv_uses_degree_before_project_severity_tie_breaker():
+    item = problem({
+        "HIGH": ["R1", "R2"],
+        "DEGREE": ["R3", "R4"],
+        "NEIGHBOR": ["R3", "R5", "R6"],
+    }, {"HIGH": 5, "DEGREE": 1, "NEIGHBOR": 1})
+    assert select_unassigned_variable(item, {}) == "DEGREE"
 
 
 def test_lcv_prefers_value_with_fewer_neighbor_eliminations():

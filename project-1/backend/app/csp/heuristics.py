@@ -7,7 +7,7 @@ def select_unassigned_variable(
     problem: CSPProblem,
     assignment: dict[str, str],
 ) -> str:
-    """MRV first, then severity, then dynamic Degree, then stable variable ID."""
+    """Lecture-5 order: MRV, Degree tie-break, severity, stable variable ID."""
     problem.metrics.mrv_selections += 1
     unassigned = [name for name in problem.variables if name not in assignment]
     used = set(assignment.values())
@@ -17,7 +17,7 @@ def select_unassigned_variable(
             1 for value in problem.domains[name] if value not in used
         )
         degree = sum(1 for other in problem.neighbors[name] if other not in assignment)
-        return legal_count, -problem.variables[name].severity, -degree, name
+        return legal_count, -degree, -problem.variables[name].severity, name
 
     return min(unassigned, key=key)
 

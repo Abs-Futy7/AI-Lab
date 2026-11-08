@@ -40,9 +40,9 @@ def config() -> dict[str, Any]:
         },
         "heuristics": {
             "variable_ordering": "MRV",
-            "tie_breakers": ["highest severity", "highest dynamic degree", "stable variable ID"],
+            "tie_breakers": ["highest dynamic degree", "highest severity", "stable variable ID"],
             "value_ordering": "LCV, then travel time, then resource ID",
-            "inference": "AC-3 preprocessing",
+            "inference": "AC-3 preprocessing + Forward Checking during Backtracking",
         },
     }
 

@@ -103,7 +103,7 @@
 @media (max-width: 650px) { .comparison-verdict-grid { grid-template-columns: 1fr; }.comparison-verdict > header { flex-direction: column; }.comparison-dashboard-priority { padding: 13px; } }
 
 /* Dedicated three-solver comparison page */
-.lab2-comparison-page { max-width: 1980px; }
+.lab2-comparison-page { width: 100%; max-width: none; margin: 0; padding-inline: clamp(10px,1.1vw,24px); }
 .comparison-page-header { justify-content: flex-start; }
 .comparison-back { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; color: #334155; background: #fff; text-decoration: none; font-size: 11px; font-weight: 850; }
 .comparison-scenario-id { margin-left: auto; padding: 6px 9px; border: 1px solid #bbf7d0; border-radius: 999px; color: #166534; background: #f0fdf4; font-size: 10px; font-weight: 850; }
@@ -116,7 +116,7 @@
 .solver-map-card > header { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; }
 .solver-map-card > header > div { min-width: 0; display: flex; align-items: center; gap: 9px; }.solver-map-card > header > div > span { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 8px; color: #fff; background: var(--solver-color); font-size: 11px; font-weight: 900; }
 .solver-map-card h2 { margin: 0; color: #1e293b; font-size: 14px; }.solver-map-card header p { margin: 3px 0 0; color: #64748b; font-size: 10px; }.solver-map-card header > strong { flex: 0 0 auto; color: #166534; font-size: 10px; }
-.solver-map-card .lab2-map-frame,.solver-map-card .lab2-map-loading { height: 390px; border-width: 1px 0; border-radius: 0; }
+.solver-map-card .lab2-map-frame,.solver-map-card .lab2-map-loading { height: clamp(420px,42vh,560px); border-width: 1px 0; border-radius: 0; }
 .solver-map-card .lab2-map-legend { max-width: calc(100% - 20px); flex-wrap: wrap; gap: 6px 9px; padding: 6px 8px; }.solver-map-card .lab2-map-legend span { font-size: 8px; }
 .solver-map-card > footer { display: grid; grid-template-columns: repeat(5,1fr); gap: 1px; background: #dbe4ee; }.solver-map-card > footer span { min-width: 0; padding: 9px 7px; background: #fff; }.solver-map-card > footer small,.solver-map-card > footer b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.solver-map-card > footer small { color: #64748b; font-size: 8px; font-weight: 750; text-transform: uppercase; }.solver-map-card > footer b { margin-top: 4px; color: #1e293b; font-size: 10px; }
 .lab2-comparison-page .comparison-dashboard-priority { margin-top: 18px; }

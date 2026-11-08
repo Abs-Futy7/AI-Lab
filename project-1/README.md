@@ -1234,15 +1234,15 @@ Recorded metrics are:
 
 The exact deterministic ordering is implemented in `backend/app/csp/heuristics.py`.
 
-### MRV, severity, and Degree
+### MRV/MCV, Degree, and severity
 
 The next variable is selected by this tuple:
 
 ```text
-(fewest legal values, highest severity, highest dynamic degree, stable variable ID)
+(fewest legal values, highest dynamic degree, highest severity, stable variable ID)
 ```
 
-MRV exposes failures early. Severity prioritizes the more critical emergency when MRV ties. Degree chooses the variable constraining the most still-unassigned neighbors. The final variable ID tie-break keeps repeated demonstrations deterministic.
+MRV—called MCV/Most Constrained Variable in the lecture—exposes failures early. Following Lecture 5 exactly, Degree breaks an MRV tie by choosing the variable constraining the most still-unassigned neighbors. Severity is consulted only if MRV and Degree both tie. The final variable ID keeps repeated demonstrations deterministic.
 
 ### Least Constraining Value
 
@@ -1253,7 +1253,7 @@ LCV counts how many unassigned neighbor domains contain each candidate resource.
 `backend/app/csp/backtracking.py` is a standard recursive depth-first CSP solver:
 
 1. Return when the assignment contains every variable.
-2. Select the next variable with MRV/severity/Degree.
+2. Select the next variable with MRV/MCV, then Degree; use severity only as a final project tie-break.
 3. Try values in LCV order.
 4. Reject a value if it conflicts with an assigned neighbor.
 5. Assign it and forward-check by temporarily removing the same resource from unassigned neighbors.
@@ -1322,7 +1322,7 @@ The dedicated `/lab2` page contains:
 - a dedicated `/lab2/comparison` page opened by Compare All, keeping the main Lab-2 dashboard focused;
 - three separate solver maps showing Backtracking, CBJ, and Min-Conflicts allocations over identical incidents and centers;
 - a transparent per-run recommendation plus fastest, leanest-exact-search, and lowest-cost conclusions;
-- radar, runtime/effort scatter, operational cost/response scatter, allocation donuts, and a green-and-white normalized exact-value heatmap;
+- radar, operational cost/response scatter, allocation donuts, and a green-and-white normalized exact-value heatmap;
 - derived allocation rate, pruning rate, cost per allocation, allocations per effort, throughput, and Min-Conflicts conflict-reduction calculations;
 - algorithm-specific search-flow diagrams and an axis-labeled Min-Conflicts history chart instead of empty trace panels;
 - expanded-node, runtime, weighted-cost, and route-distance graphs in the six-algorithm Lab-1 comparison window;
@@ -1330,7 +1330,7 @@ The dedicated `/lab2` page contains:
 - larger interface typography and explicit domain-retention/pruning labels;
 - Backjump trace or Min-Conflicts history;
 - allocated and unallocated requirement details;
-- a visible MRV, severity, Degree, LCV, and AC-3 explanation panel.
+- a visible Lecture 5 MRV/MCV, Degree, LCV, Forward Checking, and AC-3 explanation panel.
 
 The map automatically frames the generated centers and incidents without shaking during allocation playback.
 
@@ -1394,7 +1394,7 @@ backend/app/
 |   |-- domains.py                domain creation and route-based filtering
 |   |-- constraints.py            all-different checks and conflict counting
 |   |-- ac3.py                    manual AC-3 and REVISE
-|   |-- heuristics.py             MRV, severity, Degree, and LCV
+|   |-- heuristics.py             MRV/MCV, Degree, severity tie-break, and LCV
 |   |-- backtracking.py           recursive search and forward checking
 |   |-- backjumping.py            conflict sets and non-chronological jumps
 |   `-- local_search.py           seeded Min-Conflicts repair

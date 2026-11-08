@@ -291,17 +291,17 @@ def key(name: str) -> tuple[int, int, int, str]:
     degree = sum(
         1 for other in problem.neighbors[name] if other not in assignment
     )
-    return legal_count, -problem.variables[name].severity, -degree, name
+    return legal_count, -degree, -problem.variables[name].severity, name
 ```
 
 The order is:
 
 1. **MRV / fail first:** fewest currently legal values;
-2. **severity:** most urgent incident when MRV ties;
-3. **dynamic Degree:** most constrained unassigned neighbors;
+2. **dynamic Degree:** most constraints on still-unassigned neighbors when MRV ties;
+3. **severity:** most urgent incident only when MRV and Degree both tie;
 4. **stable ID:** reproducible final tie-break.
 
-Severity is a domain-specific tie-break; it does not replace MRV or Degree.
+This is the Lecture 5 combined strategy: MRV (also called MCV / Most Constrained Variable), Degree as its tie-breaker, and then LCV for value ordering. Severity is only a domain-specific tie-break after the lecture heuristics; it never overrides MRV or Degree.
 
 ### Value ordering
 
@@ -528,7 +528,7 @@ def enforce_arc_consistency(problem):
     return True
 ```
 
-### MRV + severity + Degree
+### MRV + Degree + severity
 
 ```python
 def select_unassigned_variable(problem, assignment):
@@ -555,7 +555,7 @@ def select_unassigned_variable(problem, assignment):
     return min(unassigned, key=key)
 ```
 
-For example, if `A` has 2 legal values and degree 8 while `B` has 1 legal value and degree 2, MRV chooses `B`. Degree is consulted only after the MRV count (and project severity tie-break) is equal.
+For example, if `A` has 2 legal values and degree 8 while `B` has 1 legal value and degree 2, MRV chooses `B`. Degree is consulted only after the MRV count is equal. Project severity is consulted only if both MRV and Degree tie.
 
 ### LCV
 
@@ -735,7 +735,7 @@ X3 = INC-003_FIRE_UNIT_1, D(X3) = {FIRE01, FIRE02}
 
 1. AC-3 examines `X1 -> X2`. `AMB01` in `D(X1)` has no different supporting value in singleton `D(X2)={AMB01}`, so it removes `AMB01` from `D(X1)`.
 2. Domains become `D(X1)={AMB02}`, `D(X2)={AMB01}`, and `D(X3)={FIRE01,FIRE02}`.
-3. MRV ties `X1` and `X2` at one value; severity, Degree, then ID settle the choice.
+3. MRV ties `X1` and `X2` at one value; Degree, then project severity, then ID settle the choice.
 4. Backtracking assigns the singleton ambulance values without conflict.
 5. LCV orders `X3`'s values. Because it has no unassigned neighbors, both have impact zero; travel time decides.
 6. The complete assignment is consistent because every requirement is assigned and the two ambulance variables use distinct IDs.
@@ -801,7 +801,6 @@ The comparison includes:
 - a per-run recommendation that prioritizes complete satisfaction, allocation rate, final conflicts, response time, dispatch cost, and finally runtime;
 - separate fastest-runtime, leanest-exact-search, and lowest-cost conclusions;
 - a radar profile for speed, low constraint-check work, allocation, conflict control, and shared domain pruning;
-- a runtime-versus-work scatter plot, with explicit notice that exact-search nodes and Min-Conflicts repair steps are different units;
 - an operational scatter plot comparing average response time with dispatch cost per allocation;
 - allocation/unallocation donuts;
 - a green-and-white normalized heatmap containing exact values and within-run scores;
@@ -886,14 +885,14 @@ npm run dev
 
 Open `http://localhost:3000/lab2` and `http://localhost:8000/docs`.
 
-The tests cover AC-3 pruning/empty domains, MRV/severity/Degree, LCV, exact and partial Backtracking, uniqueness, actual CBJ skips, Min-Conflicts repair, clone isolation, every unary filter, feasible partial playback, API solving, fair comparison, and serverless frozen-state handling.
+The tests cover AC-3 pruning/empty domains, the Lecture 5 MRV/MCV → Degree ordering, the project severity tie-break, LCV, exact and partial Backtracking, uniqueness, actual CBJ skips, Min-Conflicts repair, clone isolation, every unary filter, feasible partial playback, API solving, fair comparison, and serverless frozen-state handling.
 
 ### Solver comparison
 
 | Property | Backtracking + FC | Conflict-Directed Backjumping | Min-Conflicts |
 |---|---|---|---|
 | State style | Consistent partial assignment | Consistent partial assignment + conflict sets | Complete, possibly inconsistent assignment |
-| Variable choice | MRV, severity, Degree | MRV, severity, Degree | Seeded choice among conflicted variables |
+| Variable choice | MRV, Degree, severity | MRV, Degree, severity | Seeded choice among conflicted variables |
 | Value choice | LCV | LCV, including used values for culprit discovery | Minimum conflicts, then travel time |
 | Failure recovery | Previous recursive level | Most recent relevant culprit | Repair another conflicted value |
 | Completeness | Yes for finite CSP without operational limits | Yes for finite CSP under its exhaustive recursion | No |
@@ -934,7 +933,7 @@ Preprocessing is shared. AC-3 is not counted as a fourth allocation solver becau
 
 **Can AC-3 detect every `Alldiff` shortage?** No. Binary inequalities may all have local support while a group collectively has too few distinct values. The resource-union check detects the obvious type-wise pigeonhole case, but it is not a full global `Alldiff` propagator.
 
-**Why is severity between MRV and Degree?** It is a project-specific emergency policy. MRV retains fail-first correctness-neutral ordering; when counts tie, handling the more severe incident first makes the trace operationally meaningful, then Degree chooses broader constraint influence.
+**Where is severity used?** It is a project-specific emergency tie-break only after the lecture's MRV and Degree decisions tie. This keeps the exact Lecture 5 ordering while making otherwise equal choices operationally meaningful.
 
 **Can heuristics change whether a valid solution exists?** No. MRV, Degree, and LCV change only the order of exploration. Hard constraints define the solution set.
 
@@ -986,4 +985,4 @@ Preprocessing is shared. AC-3 is not counted as a fourth allocation solver becau
 
 ## One-sentence defense
 
-Lab 2 is a finite discrete emergency-allocation CSP that manually combines unary filtering, a sparse binary `Alldiff` graph, AC-3 preprocessing, MRV + Degree, LCV, Forward-Checking Backtracking, Conflict-Directed Backjumping, and seeded Min-Conflicts, while reusing Lab 1 only for road-based feasibility evidence.
+Lab 2 is a finite discrete emergency-allocation CSP that manually combines unary filtering, a sparse binary `Alldiff` graph, AC-3 preprocessing, the Lecture 5 MRV/MCV → Degree → LCV ordering, Forward-Checking Backtracking, Conflict-Directed Backjumping, and seeded Min-Conflicts, while reusing Lab 1 only for road-based feasibility evidence.

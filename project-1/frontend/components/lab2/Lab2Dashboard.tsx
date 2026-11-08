@@ -189,9 +189,9 @@ export default function Lab2Dashboard() {
         <div><span className="eyebrow">CSP decision policy</span><h2>Heuristics and inference</h2></div>
         <div className="heuristic-grid">
           <article><strong>MRV</strong><span>Choose the unassigned requirement with the fewest legal resources.</span></article>
-          <article><strong>Severity → Degree</strong><span>Break MRV ties by criticality, then the most constrained neighbors.</span></article>
+          <article><strong>Degree → Severity</strong><span>Break MRV ties by most-constraining Degree, then emergency severity.</span></article>
           <article><strong>LCV</strong><span>Try the resource that removes the fewest choices from other requirements.</span></article>
-          <article><strong>AC‑3</strong><span>Revise binary no-double-allocation arcs before the selected solver starts.</span></article>
+          <article><strong>AC‑3 + FC</strong><span>Preprocess arcs with AC‑3; Backtracking then forward-checks after each assignment.</span></article>
         </div>
       </section>
 

@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowLeft, FastForward, LoaderCircle, Pause, Play, RotateCcw, StepForward } from "lucide-react";
 
@@ -90,13 +89,13 @@ export default function ComparisonSimulation({ request }: { request: ComparisonR
   return (
     <main className="comparison-simulation-shell">
       <header className="simulation-window-header">
-        <Link href="/lab1" className="back-link"><ArrowLeft size={18} /> Back to Project 1</Link>
+        <a href="/lab1" className="back-link"><ArrowLeft size={18} /> Back to Project 1</a>
         <div><span className="eyebrow">Synchronized experiment</span><h1>Six-way live search simulation</h1></div>
         <div className="simulation-context"><span>{request.scenario.replaceAll("_", " ")}</span><span>{request.network_scale} network</span></div>
       </header>
 
       {loading && <div className="comparison-loading"><LoaderCircle className="spin" size={30} /><h2>Running all six algorithms</h2><p>Every algorithm receives the same graph, scenario, source, destination, and weights.</p></div>}
-      {error && <div className="comparison-error"><strong>Could not start comparison</strong><p>{error}</p><Link href="/lab1">Return to Project 1</Link></div>}
+      {error && <div className="comparison-error"><strong>Could not start comparison</strong><p>{error}</p><a href="/lab1">Return to Project 1</a></div>}
 
       {comparison && (
         <>
