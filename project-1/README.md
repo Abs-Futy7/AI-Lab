@@ -1321,6 +1321,7 @@ The dedicated `/lab2` page contains:
 - solver-specific metrics and measured runtime;
 - a dedicated `/lab2/comparison` page opened by Compare All, keeping the main Lab-2 dashboard focused;
 - three separate solver maps showing Backtracking, CBJ, and Min-Conflicts allocations over identical incidents and centers;
+- a bottom route-difference map that hides common assignments and overlays only solver disagreements using blue solid Backtracking, orange dashed CBJ, and purple dotted Min-Conflicts routes, with per-requirement filtering and assignment tooltips;
 - a transparent per-run recommendation plus fastest, leanest-exact-search, and lowest-cost conclusions;
 - radar, operational cost/response scatter, allocation donuts, and a green-and-white normalized exact-value heatmap;
 - derived allocation rate, pruning rate, cost per allocation, allocations per effort, throughput, and Min-Conflicts conflict-reduction calculations;

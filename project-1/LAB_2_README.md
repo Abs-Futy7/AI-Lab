@@ -804,7 +804,10 @@ The comparison includes:
 - an operational scatter plot comparing average response time with dispatch cost per allocation;
 - allocation/unallocation donuts;
 - a green-and-white normalized heatmap containing exact values and within-run scores;
-- formula cards for each solver.
+- formula cards for each solver;
+- a final **solver route difference map** that spatially isolates only the requirements on which Backtracking, CBJ, and Min-Conflicts chose different resources or produced an allocation gap.
+
+The difference map compares assignments by CSP variable. If all three solvers assign the same resource ID, that common route is hidden so agreement does not create visual noise. If their resource IDs differ—or any solver leaves the variable unallocated—the map draws the available routes with distinct encodings: Backtracking is blue/solid, CBJ is orange/dashed, and Min-Conflicts is purple/dotted. A requirement selector isolates one disagreement, solver buttons toggle route layers, and each incident tooltip lists the three choices and response times side by side. Summary counters distinguish differing requirements, full agreements, and allocation gaps. Therefore the map shows **where the algorithms' final decisions differ**, not merely which solver has the smallest aggregate metric.
 
 The derived values are:
 

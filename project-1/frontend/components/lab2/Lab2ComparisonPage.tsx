@@ -15,6 +15,11 @@ const EmergencyMap = dynamic(() => import("./EmergencyMap"), {
   loading: () => <div className="lab2-map-loading"><MapPinned size={25} /><span>Loading solver map…</span></div>,
 });
 
+const Lab2SolverDifferenceMap = dynamic(() => import("./Lab2SolverDifferenceMap"), {
+  ssr: false,
+  loading: () => <div className="difference-map-loading"><MapPinned size={25} /><span>Preparing route differences…</span></div>,
+});
+
 const solvers: Array<{ key: CSPAlgorithm; name: string; short: string; color: string }> = [
   { key: "backtracking", name: "Backtracking", short: "BT", color: "#2563eb" },
   { key: "backjumping", name: "Conflict-Directed Backjumping", short: "CBJ", color: "#f97316" },
@@ -84,6 +89,7 @@ export default function Lab2ComparisonPage() {
           <div className="lab2-table-scroll"><table><thead><tr><th>Algorithm</th><th>Solution</th><th>Allocated</th><th>Unallocated</th><th>Search / repair effort</th><th>BT / BJ / repairs</th><th>Conflicts</th><th>Runtime</th></tr></thead><tbody>{solvers.map(({ key, name }) => { const item = comparison[key]; const effort = key === "local_search" ? item.metrics.steps : item.metrics.nodes_visited; const special = key === "backtracking" ? item.metrics.backtracks : key === "backjumping" ? item.metrics.backjumps : item.metrics.repairs; return <tr key={key}><td><strong>{name}</strong></td><td>{item.solution_found ? "Yes" : "No / partial"}</td><td>{item.requirements_allocated}</td><td>{item.requirements_unallocated}</td><td>{number(effort)}</td><td>{number(special)}</td><td>{item.metrics.conflicts_final}</td><td>{item.metrics.runtime_ms.toFixed(2)} ms</td></tr>; })}</tbody></table></div>
           <Lab2ComparisonVisuals comparison={comparison} />
         </section>
+        <Lab2SolverDifferenceMap scenario={scenario} comparison={comparison} />
       </>}
     </main>
   );
