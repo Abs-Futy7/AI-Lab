@@ -8,25 +8,26 @@ Lab 2 implements the material in **CSE 4101 Lecture Slide 5: Constraint Satisfac
 
 1. [Problem and slide alignment](#problem-and-slide-alignment)
 2. [Teacher-conversation requirement audit](#teacher-conversation-requirement-audit)
-3. [What happens when the project runs](#what-happens-when-the-project-runs)
-4. [Scenario, incidents, routes, response time, and cost](#scenario-incidents-routes-response-time-and-cost)
-5. [CSP definitions and consistency methods](#csp-definitions-from-the-lecture)
-6. [Formal CSP formulation](#formal-csp-formulation)
-7. [Variables and domains in code](#variables-and-domains-in-code)
-8. [Constraints and constraint graph](#constraints-and-constraint-graph)
-9. [AC-3 constraint propagation](#ac-3-constraint-propagation)
-10. [MRV, Degree, LCV, and the meaning of heuristic](#mrv-degree-and-lcv)
-11. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
-12. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
-13. [Min-Conflicts local search](#min-conflicts-local-search)
-14. [Which solver is better and when](#which-solver-is-better-and-when)
-15. [Function-by-function implementation map](#function-by-function-implementation-map)
-16. [Line-by-line code walkthrough](#line-by-line-implementation-walkthrough)
-17. [Worked emergency example](#worked-miniature-emergency-example)
-18. [Exact project pipeline](#exact-project-pipeline)
-19. [Metrics and source layout](#metrics-and-source-layout)
-20. [API, tests, solver comparison, and viva](#api-tests-and-viva)
-21. [Assumptions and limitations](#assumptions-and-limitations)
+3. [Sir-ke step-by-step ki bolben](#sir-ke-step-by-step-ki-bolben)
+4. [What happens when the project runs](#what-happens-when-the-project-runs)
+5. [Scenario, incidents, routes, response time, and cost](#scenario-incidents-routes-response-time-and-cost)
+6. [CSP definitions and consistency methods](#csp-definitions-from-the-lecture)
+7. [Formal CSP formulation](#formal-csp-formulation)
+8. [Variables and domains in code](#variables-and-domains-in-code)
+9. [Constraints and constraint graph](#constraints-and-constraint-graph)
+10. [AC-3 constraint propagation](#ac-3-constraint-propagation)
+11. [MRV, Degree, LCV, and the meaning of heuristic](#mrv-degree-and-lcv)
+12. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
+13. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
+14. [Min-Conflicts local search](#min-conflicts-local-search)
+15. [Which solver is better and when](#which-solver-is-better-and-when)
+16. [Function-by-function implementation map](#function-by-function-implementation-map)
+17. [Line-by-line code walkthrough](#line-by-line-implementation-walkthrough)
+18. [Worked emergency example](#worked-miniature-emergency-example)
+19. [Exact project pipeline](#exact-project-pipeline)
+20. [Metrics and source layout](#metrics-and-source-layout)
+21. [API, tests, solver comparison, and viva](#api-tests-and-viva)
+22. [Assumptions and limitations](#assumptions-and-limitations)
 
 ## Problem and slide alignment
 
@@ -128,6 +129,175 @@ Core assignment আগে থেকেই complete ছিল। Teacher-audit-�
 6. Min-Conflicts run-এ initial/final conflicts, repair steps, এবং conflict-history graph দেখান।
 7. Compare All খুলে identical scenario-র তিনটি map, allocation/effort table, recommendation, এবং bottom route-difference map দেখান।
 8. শেষে satisfaction Backtracking এবং optional **Prove minimum dispatch cost** mode-এর পার্থক্য দেখান: প্রথমটি first complete solution-এ থামে; দ্বিতীয়টি branch-and-bound দিয়ে optimality prove করে।
+
+## Sir-ke step-by-step ki bolben
+
+Ei section-ta viva/demo-r somoy screen-er sathe mile directly bola jay. Eta mukhosto feature-list na; prottek step-e **ki dekhacchi, backend-e ki hocche, ebong keno hocche**—ei tin jinis connect kore.
+
+> **Important terminology:** Eta `MRB` na. Correct term holo **MRV — Minimum Remaining Values**. Lecture-e eki idea-ke **MCV — Most Constrained Variable** bola hote pare.
+
+### 1. Project-ta introduce korar somoy
+
+**Screen-e dekhabo:** Lab 2 dashboard, Dhaka map, incident markers, dispatch centers, receiving facilities.
+
+**Sir-ke bolbo:**
+
+> Sir, ami Lab 1-er road graph-ke reuse kore Lab 2-te emergency resource allocation CSP baniyechi. Lab 1 bolto kon road diye jabo; Lab 2 bolche simultaneous requirement-gular jonno kon unique physical ambulance, fire unit, ba rescue team assign hobe. Map route-ta allocation-er feasibility evidence, kintu allocation decision-ta CSP solver ney.
+
+**Behind the scenes:** Scenario generator seeded incident, resource fleet, center, hospital/burn-unit bed, deadline, capacity, availability, budget, traffic, ebong road disruption create kore. Same seed and same controls dile same experiment abar reproduce hoy.
+
+### 2. Scenario generate korar por
+
+**Screen-e dekhabo:** Incident count, CSP variable count, available resources, available receiving beds.
+
+**Sir-ke bolbo:**
+
+> Sir, incident count ar variable count always same na. Ekta severe fire incident-er jonno ekta `FIRE_UNIT` variable-er sathe ekta `AMBULANCE` variable-o hote pare. Tai ami prottek physical resource slot-ke alada CSP variable banai.
+
+**Behind the scenes:** Ekta requirement variable-er example `INC-014_AMBULANCE_1`. Tar domain prothome shob ambulance ID diye start kore. Type mismatch, unavailable, insufficient capacity, unreachable route, late arrival, over-budget, ba compatible hospital bed na thakle candidate remove hoy.
+
+### 3. CSP formulation explain korar somoy
+
+**Screen-e dekhabo:** Domain Inspector-er `Before`, `Removed`, `After`, removal reasons.
+
+**Sir-ke bolbo:**
+
+> Sir, amar CSP holo `(X, D, C)`. `X` holo requirement slot-gula, `D(Xi)` holo oi requirement-er feasible physical resource ID-gula, ar `C`-te unary feasibility plus binary uniqueness ache. Main binary conflict holo same physical resource-ke dui simultaneous requirement-e deya jabe na, orthat `Xi != Xj`.
+
+**Behind the scenes:** Duita variable-er domain overlap korlei constraint-graph edge create hoy. Disjoint domain hole unnecessary edge dei na. Ete graph sparse thake, kintu correctness change hoy na.
+
+### 4. AC-3 dekhano-r somoy
+
+**Screen-e dekhabo:** AC-3 revisions/pruned values and remaining domains.
+
+**Sir-ke bolbo:**
+
+> Sir, search-er age ami AC-3 run kori. Prottek directed arc `(Xi, Xj)`-e `D(Xi)`-r kono value-er jonno `D(Xj)`-e different supporting value na thakle oi value remove kori. Domain change hole affected arc abar queue-te dei. Kono domain empty hole full CSP inconsistent hote pare.
+
+**Behind the scenes:** AC-3 local pairwise consistency dey; solution guarantee kore na. Tai group-level resource shortage dhorar jonno maximum-cardinality matching check-o ache. AC-3 ekhane preprocessing; prottek assignment-er por rerun kori na, tai eta MAC bole claim kori na.
+
+### 5. MRV/MCV kothay use hoyeche
+
+**Screen-e dekhabo:** Search Explanation-er chronological selection cards.
+
+**Sir-ke bolbo:**
+
+> Sir, ei step-e solver unassigned variable-gular current legal-domain size compare korche. Jar remaining value shobcheye kom, MRV take age select korche—eta fail-first principle. Card-e selected variable, legal-value count, recursion depth, degree, severity, and next alternatives backend thekei record hoye show hocche.
+
+**Example-e bolbo:**
+
+> Dhori `X1`-er 2ta legal ambulance, `X2`-er 5ta, `X3`-er 3ta ache. MRV `X1` select korbe. Karon `X1` fail korar possibility beshi; impossible hole search early janbe, pore boro subtree waste korbe na.
+
+### 6. Degree tie-break kothay use hoyeche
+
+**Screen-e dekhabo:** Same legal-value count-er selection trace, dynamic-degree value.
+
+**Sir-ke bolbo:**
+
+> Sir, duita variable-er MRV equal hole ami dynamic Degree use kori. Still-unassigned neighbor beshi jar, se remaining problem-ke beshi constrain kore, tai take age solve kori. Degree-o equal hole higher severity, tarpor stable variable ID use kori. Severity lecture heuristic replace kore na; eta sudhu domain-specific third tie-break.
+
+### 7. LCV kothay use hoyeche
+
+**Screen-e dekhabo:** Domain Inspector-er LCV order ba selected variable-er ordered candidates.
+
+**Sir-ke bolbo:**
+
+> Sir, MRV bole kon variable age nibo; LCV bole oi variable-er kon resource value age try korbo. Je resource-ta use korle neighbor variable-gular kom choice noshto hoy, take age try kori. Equal impact hole shorter response time, tarpor stable resource ID use kori.
+
+**Behind the scenes:** LCV minimum total cost guarantee kore na. Eta search ordering heuristic. Globally cheapest assignment prove korar jonno alada optional branch-and-bound mode ache.
+
+### 8. Backtracking step-by-step explain korar somoy
+
+**Screen-e dekhabo:** Backtracking solve result, selection trace, search nodes, backtracks, allocation playback.
+
+**Sir-ke bolbo:**
+
+> Sir, Backtracking prothome MRV/Degree diye variable select kore, tarpor LCV order-e ekta resource try kore. Existing assignment-er sathe conflict na hole assign kore. Forward Checking diye oi resource-ta direct unassigned neighbor-gular domain theke temporarily remove kore. Kono neighbor-er domain empty hole current choice fail; tokhon shob temporary removal restore kore previous decision-e fire giye next value try kore.
+
+**Ekta miniature step evabe bolbo:**
+
+```text
+Step 1: MRV X1 select korlo; domain = {AMB03, AMB07}
+Step 2: LCV AMB07 age try korlo
+Step 3: X1 = AMB07 assign holo
+Step 4: Forward Checking neighbor domain theke AMB07 remove korlo
+Step 5: Pore X4-er domain empty holo
+Step 6: Solver X1 decision-e backtrack korlo, pruning restore korlo
+Step 7: Ebar X1 = AMB03 try kore search continue korlo
+```
+
+> Ei map-e final route show hocche karon complete consistent assignment pawar por selected resource-er frozen road-route evidence frontend playback korche. Search-er prottek failed branch map-e route hishebe dekhai na; final allocation-ke clear rakhi.
+
+### 9. Conflict-Directed Backjumping explain korar somoy
+
+**Screen-e dekhabo:** CBJ result, conflict set, jump source/target, skipped variables.
+
+**Sir-ke bolbo:**
+
+> Sir, normal Backtracking immediate previous variable-e fire. CBJ dead-end-er responsible assigned variable-gular conflict set carry kore. Tarpor most recent relevant culprit-e directly jump kore; majher irrelevant decision skip korte pare. Tai deep dependency-heavy failure-e CBJ kom node visit korte pare.
+
+**Example-e bolbo:**
+
+> Jodi `X5` fail kore mainly `X2`-r resource choice-er karone, kintu `X3` ar `X4` relevant na hoy, normal Backtracking `X4`-e fire; CBJ `X3`, `X4` skip kore `X2`-te jump korte pare. Easy run-e jump zero hole implementation wrong na—meaningful non-chronological conflict pawa jayni.
+
+### 10. Min-Conflicts explain korar somoy
+
+**Screen-e dekhabo:** Repair steps, initial/final conflicts, conflict-history graph.
+
+**Sir-ke bolbo:**
+
+> Sir, Min-Conflicts recursive partial assignment build kore na. Eta prothome complete but possibly conflicting assignment banay. Tarpor ekta conflicted variable select kore je resource dile conflict minimum hoy, shei value diye repair kore. Zero conflict hole success; max step shesh hole failure return korte pare, kintu unsatisfiable prove korte pare na.
+
+**Behind the scenes:** Seed use korar karone repair experiment reproducible. Large satisfiable problem-e local repair fast hote pare; plateau ba cycle hole exact Backtracking/CBJ-r moto completeness guarantee nei.
+
+### 11. Hospital, route, response time, and cost dekhano-r somoy
+
+**Screen-e dekhabo:** Facility cards, solid allocation route, red dashed hospital route, cost evidence.
+
+**Sir-ke bolbo:**
+
+> Sir, ambulance-er response dui leg-e visualize kori. Colored solid line holo dispatch center theke incident. Red dashed line holo incident theke reserved compatible receiving facility. Fire-related ambulance burn-unit capability chai; onno ambulance emergency bed chai. Bed same time-e duibar reserve hoy na.
+
+> Response deadline first emergency-arrival leg-e check kori. Cost holo base dispatch cost plus billable road distance. Ambulance-er billable distance-e incident-to-hospital second leg-o add hoy. Candidate budget cross korle search-er agei domain theke remove hoy.
+
+### 12. Compare All page-e ki bolben
+
+**Screen-e dekhabo:** Three solver maps first, metrics, recommendation, and bottom difference map.
+
+**Sir-ke bolbo:**
+
+> Sir, fair comparison-er jonno one frozen prepared CSP clone kore tin solver-ke dei. Incident, resource, domain, route evidence, road closure, and seed same; sudhu allocation algorithm change hoy. Recommendation prothome complete solution, tarpor conflicts/allocation quality, response, cost, and runtime dekhe. Universal winner claim kori na.
+
+> Bottom difference map common assignment hide kore. Je requirement-e solver-gula different resource choose kore ba keu unallocated rakhe, sudhu shei differing routes blue solid, orange dashed, and purple dotted style-e overlay hoy. Tai exactly kothay algorithm-er decision change hoyeche seta dekha jay.
+
+### 13. Optional minimum-cost mode dekhano-r somoy
+
+**Screen-e dekhabo:** Backtracking selected thaka obosthay `Prove minimum dispatch cost` switch and optimized result.
+
+**Sir-ke bolbo:**
+
+> Sir, normal Backtracking first complete consistent solution-e stop kore. Optional minimum-cost mode-e branch-and-bound first solution-er cost-ke incumbent banay. Current partial cost plus remaining variable-gular optimistic cheapest cost jodi incumbent-er cheye better hote na pare, branch prune kore. Relevant tree finish hole returned complete assignment-er minimum total dispatch cost proven hoy.
+
+> Eta default Compare All-e add kori nai, karon tokhon Backtracking-er objective and stopping condition change hoye unfair runtime comparison hoto.
+
+### 14. Demo shesh korar short summary
+
+> Sir, amar pipeline holo: seeded scenario generate → incident-ke requirement variables-e expand → unary feasibility diye domain build → sparse uniqueness constraint graph → AC-3 and shortage matching → MRV/Degree variable ordering → LCV value ordering → selected solver → resource assignment-ke stored road evidence diye map-e animate → same frozen problem-e comparison. Ekhane route search allocation kore na; CSP allocation kore, route feasibility and explanation provide kore.
+
+### Sir majhkhane code point korte bolle
+
+| Sir jodi jiggesh koren | Je function/file dekhabo | One-line answer |
+|---|---|---|
+| Incident/resource kothay create? | `emergency/scenario_generator.py` | Seeded scenario, fleet, facility, deadline, capacity, and budget create kore |
+| Domain kothay filter hoy? | `csp/domains.py::build_problem` | Availability, capacity, route, time, budget, and bed feasibility apply kore |
+| AC-3 kothay? | `csp/ac3.py::ac3` and `revise` | Unsupported domain value remove kore and affected arcs requeue kore |
+| MRV/Degree kothay? | `csp/heuristics.py::select_unassigned_variable` | Current search state theke variable rank kore and trace record kore |
+| LCV kothay? | `csp/heuristics.py::order_domain_values` | Neighbor flexibility maximum rakha value age dey |
+| Backtracking kothay? | `csp/backtracking.py::solve_backtracking` | Assign, Forward Check, recurse, restore, and backtrack kore |
+| Backjumping kothay? | `csp/backjumping.py::solve_backjumping` | Conflict set propagate kore relevant culprit-e jump kore |
+| Min-Conflicts kothay? | `csp/local_search.py::solve_min_conflicts` | Complete conflicted assignment-ke iterative repair kore |
+| Minimum-cost proof kothay? | `csp/min_cost.py::solve_min_cost_backtracking` | Incumbent and optimistic bound diye exact branch-and-bound chalay |
+| Frontend allocation invent kore? | `services/lab2_service.py` → Lab 2 components | Na; backend assignment, route, metrics, and trace return kore, frontend render kore |
 
 ## What happens when the project runs
 
