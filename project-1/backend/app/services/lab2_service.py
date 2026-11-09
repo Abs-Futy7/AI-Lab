@@ -11,6 +11,7 @@ from app.csp.backtracking import solve_backtracking
 from app.csp.constraints import has_enough_distinct_resources
 from app.csp.domains import build_problem
 from app.csp.local_search import solve_min_conflicts
+from app.csp.min_cost import solve_min_cost_backtracking
 from app.csp.model import CSPMetrics, CSPProblem
 from app.emergency.models import (
     CSPAlgorithm,
@@ -43,6 +44,7 @@ def config() -> dict[str, Any]:
             "tie_breakers": ["highest dynamic degree", "highest severity", "stable variable ID"],
             "value_ordering": "LCV, then travel time, then resource ID",
             "inference": "AC-3 preprocessing + Forward Checking during Backtracking",
+            "optional_objective": "Branch-and-bound minimum total dispatch cost (Backtracking only)",
         },
     }
 
@@ -68,18 +70,25 @@ def list_resources(scenario_id: str | None = None) -> dict[str, Any]:
         "scenario_id": scenario.id,
         "centers": [item.model_dump(mode="json") for item in scenario.centers],
         "resources": [item.model_dump(mode="json") for item in scenario.resources],
+        "facilities": [item.model_dump(mode="json") for item in scenario.facilities],
     }
 
 
 def solve(request: SolveRequest) -> dict[str, Any]:
     scenario = _scenario(request.scenario_id, request.scenario)
     problem = _base_problem(scenario).clone()
+    if request.optimize_cost and request.algorithm != CSPAlgorithm.backtracking:
+        raise HTTPException(
+            status_code=400,
+            detail="Minimum-cost branch-and-bound is available with Backtracking only.",
+        )
     raw = _solve_problem(
         problem,
         request.algorithm,
         scenario.config.seed,
         request.debug,
         request.local_search_max_steps,
+        request.optimize_cost,
     )
     return _result_payload(scenario, problem, request.algorithm, raw)
 
@@ -111,8 +120,11 @@ def _run_selected_solver(
     seed: int,
     debug: bool,
     local_search_max_steps: int,
+    optimize_cost: bool = False,
 ) -> dict[str, Any]:
     if algorithm == CSPAlgorithm.backtracking:
+        if optimize_cost:
+            return solve_min_cost_backtracking(problem)
         return solve_backtracking(problem)
     if algorithm == CSPAlgorithm.backjumping:
         return solve_backjumping(problem, debug)
@@ -208,22 +220,24 @@ def _solve_problem(
     seed: int,
     debug: bool,
     local_search_max_steps: int,
+    optimize_cost: bool = False,
 ) -> dict[str, Any]:
     consistent = enforce_arc_consistency(problem)
     if consistent and has_enough_distinct_resources(problem):
         return _run_selected_solver(
-            problem, algorithm, seed, debug, local_search_max_steps
+            problem, algorithm, seed, debug, local_search_max_steps, optimize_cost
         )
 
     if not consistent or not has_enough_distinct_resources(problem):
         reduced = _maximal_feasible_problem(problem)
         if reduced is not None and reduced.variables:
             raw = _run_selected_solver(
-                reduced, algorithm, seed, debug, local_search_max_steps
+                reduced, algorithm, seed, debug, local_search_max_steps, optimize_cost
             )
             for name, inspection in reduced.domain_inspection.items():
                 problem.domain_inspection[name] = inspection
             problem.metrics = reduced.metrics
+            problem.selection_trace = reduced.selection_trace
             raw["solution_found"] = False
             raw["failure_reason"] = (
                 "Some requirements cannot receive a distinct feasible resource after "
@@ -294,12 +308,16 @@ def _scenario_payload(scenario: Lab2Scenario) -> dict[str, Any]:
         "incidents": [item.model_dump(mode="json") for item in scenario.incidents],
         "resources": [item.model_dump(mode="json") for item in scenario.resources],
         "centers": [item.model_dump(mode="json") for item in scenario.centers],
+        "facilities": [item.model_dump(mode="json") for item in scenario.facilities],
         "assumptions": scenario.assumptions,
         "summary": {
             "incidents": len(scenario.incidents),
             "requirements": requirement_count,
             "resources": len(scenario.resources),
             "available_resources": sum(resource.available for resource in scenario.resources),
+            "facilities": len(scenario.facilities),
+            "available_beds": sum(item.available_beds for item in scenario.facilities),
+            "total_beds": sum(item.total_beds for item in scenario.facilities),
         },
     }
 
@@ -346,6 +364,10 @@ def _result_payload(
             "travel_time_minutes": round(candidate.travel_time_minutes, 2),
             "estimated_cost": round(candidate.estimated_cost, 2),
             "route": candidate.route,
+            "receiving_facility_id": candidate.receiving_facility_id,
+            "facility_travel_time_minutes": round(candidate.facility_travel_time_minutes, 2),
+            "facility_distance_m": round(candidate.facility_distance_m, 2),
+            "facility_route": candidate.facility_route,
         })
 
     requirement_total = len(problem.variables)
@@ -370,8 +392,15 @@ def _result_payload(
             "average_response_time": round(mean(response_times), 2) if response_times else 0,
             "average_distance_m": round(mean(distances), 2) if distances else 0,
             "total_dispatch_cost": round(sum(costs), 2),
+            "cost_optimized": bool(raw.get("cost_optimized", False)),
+            "optimal_cost": (
+                round(raw["optimal_cost"], 2)
+                if raw.get("optimal_cost") is not None else None
+            ),
+            "objective": raw.get("objective", "satisfaction"),
         },
         "domain_inspection": [problem.domain_inspection[name] for name in sorted(problem.variables)],
         "backjump_trace": raw.get("trace", []),
         "conflict_history": raw.get("conflict_history", []),
+        "selection_trace": problem.selection_trace,
     }

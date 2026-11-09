@@ -24,6 +24,10 @@ class CandidateValue:
     travel_time_minutes: float
     estimated_cost: float
     route: list[dict[str, float]]
+    receiving_facility_id: str | None = None
+    facility_travel_time_minutes: float = 0.0
+    facility_distance_m: float = 0.0
+    facility_route: list[dict[str, float]] = field(default_factory=list)
 
 
 @dataclass
@@ -61,6 +65,7 @@ class CSPProblem:
     neighbors: dict[str, set[str]]
     domain_inspection: dict[str, dict[str, Any]]
     metrics: CSPMetrics = field(default_factory=CSPMetrics)
+    selection_trace: list[dict[str, Any]] = field(default_factory=list)
 
     def clone(self) -> "CSPProblem":
         return CSPProblem(
@@ -75,4 +80,5 @@ class CSPProblem:
                 domain_values_pruned=self.metrics.domain_values_pruned,
                 arc_revisions=self.metrics.arc_revisions,
             ),
+            selection_trace=deepcopy(self.selection_trace),
         )

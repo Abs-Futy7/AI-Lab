@@ -12,14 +12,36 @@ def select_unassigned_variable(
     unassigned = [name for name in problem.variables if name not in assignment]
     used = set(assignment.values())
 
-    def key(name: str) -> tuple[int, int, int, str]:
+    def evidence(name: str) -> tuple[int, int, int, str]:
         legal_count = sum(
             1 for value in problem.domains[name] if value not in used
         )
         degree = sum(1 for other in problem.neighbors[name] if other not in assignment)
         return legal_count, -degree, -problem.variables[name].severity, name
 
-    return min(unassigned, key=key)
+    ranked = sorted(unassigned, key=evidence)
+    selected = ranked[0]
+    legal_count, negative_degree, negative_severity, _ = evidence(selected)
+    if len(problem.selection_trace) < 120:
+        problem.selection_trace.append({
+            "step": len(problem.selection_trace) + 1,
+            "depth": len(assignment),
+            "selected": selected,
+            "legal_values": legal_count,
+            "dynamic_degree": -negative_degree,
+            "severity": -negative_severity,
+            "reason": "MRV, then Degree, then Severity, then stable variable ID",
+            "alternatives": [
+                {
+                    "variable": name,
+                    "legal_values": evidence(name)[0],
+                    "dynamic_degree": -evidence(name)[1],
+                    "severity": -evidence(name)[2],
+                }
+                for name in ranked[1:4]
+            ],
+        })
+    return selected
 
 
 def order_domain_values(

@@ -9,11 +9,13 @@ from app.emergency.models import (
     Incident,
     IncidentType,
     Lab2Scenario,
+    ReceivingFacility,
     Resource,
     ResourceType,
     ScalePreset,
     ScenarioGenerateRequest,
 )
+from app.emergency.facilities import FACILITY_DEFINITIONS
 from app.emergency.presets import (
     BASE_REQUIREMENTS,
     DEADLINE_MINUTES,
@@ -133,6 +135,33 @@ def _make_incidents(request: ScenarioGenerateRequest, rng: random.Random) -> lis
     return incidents
 
 
+def _make_facilities(
+    request: ScenarioGenerateRequest, rng: random.Random
+) -> list[ReceivingFacility]:
+    requested = request.request_count or SCALE_REQUESTS[request.scale]
+    scale_multiplier = 1 if requested <= 30 else 4 if requested <= 100 else 12
+    availability_factor = {
+        AvailabilityPolicy.high: 0.95,
+        AvailabilityPolicy.normal: 0.75,
+        AvailabilityPolicy.shortage: 0.35,
+    }[request.resource_availability]
+    facilities: list[ReceivingFacility] = []
+    for item in FACILITY_DEFINITIONS:
+        total = item.small_scale_beds * scale_multiplier
+        # The seed makes bed readiness reproducible while retaining variation.
+        available = round(total * availability_factor * rng.uniform(0.85, 1.0))
+        facilities.append(ReceivingFacility(
+            id=item.id,
+            name=item.name,
+            latitude=item.latitude,
+            longitude=item.longitude,
+            capabilities=list(item.capabilities),
+            total_beds=total,
+            available_beds=max(0, min(total, available)),
+        ))
+    return facilities
+
+
 def generate_scenario(request: ScenarioGenerateRequest) -> Lab2Scenario:
     rng = random.Random(request.seed)
     signature = hashlib.sha1(request.model_dump_json().encode()).hexdigest()[:12]
@@ -142,10 +171,12 @@ def generate_scenario(request: ScenarioGenerateRequest) -> Lab2Scenario:
         incidents=_make_incidents(request, rng),
         resources=_make_resources(request, rng),
         centers=RESOURCE_CENTERS,
+        facilities=_make_facilities(request, rng),
         assumptions=[
             "Incidents, availability, capacities, costs, severity, and deadlines are simulated.",
             "Resource-center locations remain fixed during a scenario.",
             "Road accessibility comes from the shared Lab-1 scenario graph.",
+            "Receiving hospitals and burn-unit beds are simulated and reserved during preprocessing.",
             "This educational system is not intended for real emergency dispatch.",
         ],
     )

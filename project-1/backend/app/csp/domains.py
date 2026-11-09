@@ -1,7 +1,13 @@
 from collections import defaultdict
 
 from app.csp.model import CandidateValue, CSPProblem, RequirementVariable
-from app.emergency.models import Lab2Scenario, Resource, ResourceType
+from app.emergency.models import (
+    FacilityCapability,
+    IncidentType,
+    Lab2Scenario,
+    Resource,
+    ResourceType,
+)
 from app.services.routing_service import (
     calculate_lab2_candidate_route,
     prepare_lab2_road_graph,
@@ -27,6 +33,65 @@ def _variables(scenario: Lab2Scenario) -> dict[str, RequirementVariable]:
     return variables
 
 
+def _reserve_receiving_facilities(
+    scenario: Lab2Scenario,
+    variables: dict[str, RequirementVariable],
+    graph,
+) -> dict[str, dict]:
+    """Reserve one compatible bed for each ambulance requirement.
+
+    This deterministic preprocessing prevents hospital overbooking. Higher
+    severity and tighter deadlines receive beds first; the nearest reachable
+    compatible facility wins. It is intentionally separate from vehicle
+    allocation so the lecture CSP remains resource-ID based.
+    """
+    if not scenario.facilities:
+        return {}
+    incidents = {item.id: item for item in scenario.incidents}
+    remaining = {item.id: item.available_beds for item in scenario.facilities}
+    route_cache: dict[tuple[str, str], dict] = {}
+    plan: dict[str, dict] = {}
+    ambulance_variables = sorted(
+        (
+            variable for variable in variables.values()
+            if variable.resource_type == ResourceType.ambulance
+        ),
+        key=lambda item: (
+            -item.severity,
+            incidents[item.incident_id].deadline_minutes,
+            item.id,
+        ),
+    )
+    for variable in ambulance_variables:
+        incident = incidents[variable.incident_id]
+        required = (
+            FacilityCapability.burn_unit
+            if incident.type == IncidentType.fire
+            else FacilityCapability.emergency
+        )
+        options: list[tuple[float, str, object, dict]] = []
+        for facility in scenario.facilities:
+            if remaining[facility.id] <= 0 or required not in facility.capabilities:
+                continue
+            cache_key = (incident.id, facility.id)
+            if cache_key not in route_cache:
+                route_cache[cache_key] = calculate_lab2_candidate_route(
+                    graph,
+                    incident.latitude,
+                    incident.longitude,
+                    facility.latitude,
+                    facility.longitude,
+                )
+            route = route_cache[cache_key]
+            if route["found"]:
+                options.append((route["travel_time_minutes"], facility.id, facility, route))
+        if options:
+            _, _, facility, route = min(options, key=lambda item: (item[0], item[1]))
+            remaining[facility.id] -= 1
+            plan[variable.id] = {"facility": facility, "route": route}
+    return plan
+
+
 def build_problem(scenario: Lab2Scenario) -> CSPProblem:
     """Build domains, then filter unary constraints using cached Lab-1 routes.
 
@@ -44,6 +109,7 @@ def build_problem(scenario: Lab2Scenario) -> CSPProblem:
         resources_by_center[resource.center_id].append(resource)
 
     graph = prepare_lab2_road_graph(scenario.config.road_scenario, scenario.config.seed)
+    facility_plan = _reserve_receiving_facilities(scenario, variables, graph)
     route_cache: dict[tuple[str, str], dict] = {}
     domains: dict[str, list[str]] = {}
     candidates: dict[str, dict[str, CandidateValue]] = {}
@@ -56,6 +122,17 @@ def build_problem(scenario: Lab2Scenario) -> CSPProblem:
         values: dict[str, CandidateValue] = {}
         removed: list[dict[str, str]] = []
         for resource in compatible:
+            facility_choice = facility_plan.get(variable_id)
+            if (
+                variable.resource_type == ResourceType.ambulance
+                and scenario.facilities
+                and facility_choice is None
+            ):
+                removed.append({
+                    "resource_id": resource.id,
+                    "reason": "no compatible receiving-hospital bed available",
+                })
+                continue
             if not resource.available:
                 removed.append({"resource_id": resource.id, "reason": "resource unavailable"})
                 continue
@@ -78,7 +155,11 @@ def build_problem(scenario: Lab2Scenario) -> CSPProblem:
             if route["travel_time_minutes"] > incident.deadline_minutes:
                 removed.append({"resource_id": resource.id, "reason": "deadline exceeded"})
                 continue
-            estimated_cost = resource.dispatch_cost + route["distance_m"] / 1000 * 45.0
+            facility_route = facility_choice["route"] if facility_choice else None
+            total_distance_m = route["distance_m"] + (
+                facility_route["distance_m"] if facility_route else 0.0
+            )
+            estimated_cost = resource.dispatch_cost + total_distance_m / 1000 * 45.0
             if estimated_cost > incident.budget:
                 removed.append({"resource_id": resource.id, "reason": "incident budget exceeded"})
                 continue
@@ -89,6 +170,16 @@ def build_problem(scenario: Lab2Scenario) -> CSPProblem:
                 travel_time_minutes=route["travel_time_minutes"],
                 estimated_cost=estimated_cost,
                 route=route["route"],
+                receiving_facility_id=(
+                    facility_choice["facility"].id if facility_choice else None
+                ),
+                facility_travel_time_minutes=(
+                    facility_route["travel_time_minutes"] if facility_route else 0.0
+                ),
+                facility_distance_m=(
+                    facility_route["distance_m"] if facility_route else 0.0
+                ),
+                facility_route=(facility_route["route"] if facility_route else []),
             )
         domains[variable_id] = kept
         candidates[variable_id] = values
@@ -103,6 +194,10 @@ def build_problem(scenario: Lab2Scenario) -> CSPProblem:
             "removed": removed,
             "after": list(kept),
             "lcv_order": [],
+            "receiving_facility": (
+                facility_plan[variable_id]["facility"].id
+                if variable_id in facility_plan else None
+            ),
         }
 
     # Two variables need a binary constraint exactly when their domains share a

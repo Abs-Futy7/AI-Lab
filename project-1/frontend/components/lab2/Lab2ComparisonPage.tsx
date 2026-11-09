@@ -78,7 +78,7 @@ export default function Lab2ComparisonPage() {
             const effort = solver.key === "local_search" ? result.metrics.steps : result.metrics.nodes_visited;
             return <article className="solver-map-card" key={solver.key} style={{ "--solver-color": solver.color } as React.CSSProperties}>
               <header><div><span>{solver.short}</span><div><h2>{solver.name}</h2><p>{result.solution_found ? "Complete consistent allocation" : "Partial or unsatisfied"}</p></div></div><strong>{result.requirements_allocated}/{result.requirements_total} allocated</strong></header>
-              <EmergencyMap centers={scenario.centers} incidents={scenario.incidents} allocations={result.allocations} />
+              <EmergencyMap centers={scenario.centers} facilities={scenario.facilities ?? []} incidents={scenario.incidents} allocations={result.allocations} />
               <footer><span><small>Runtime</small><b>{result.metrics.runtime_ms.toFixed(2)} ms</b></span><span><small>{solver.key === "local_search" ? "Repair steps" : "Search nodes"}</small><b>{number(effort)}</b></span><span><small>Avg response</small><b>{result.analysis.average_response_time.toFixed(2)} min</b></span><span><small>Dispatch cost</small><b>৳{number(result.analysis.total_dispatch_cost)}</b></span><span><small>Final conflicts</small><b>{result.metrics.conflicts_final}</b></span></footer>
             </article>;
           })}

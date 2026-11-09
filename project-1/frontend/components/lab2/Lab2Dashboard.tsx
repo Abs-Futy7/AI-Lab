@@ -38,6 +38,7 @@ export default function Lab2Dashboard() {
   const router = useRouter();
   const [config, setConfig] = useState<Lab2GenerateRequest>(initialConfig);
   const [algorithm, setAlgorithm] = useState<CSPAlgorithm>("backtracking");
+  const [optimizeCost, setOptimizeCost] = useState(false);
   const [scenario, setScenario] = useState<Lab2Scenario | null>(null);
   const [result, setResult] = useState<Lab2Result | null>(null);
   const [selectedVariable, setSelectedVariable] = useState<string>("");
@@ -51,6 +52,7 @@ export default function Lab2Dashboard() {
     if (!saved) return;
     setConfig(saved.config);
     setAlgorithm(saved.algorithm);
+    setOptimizeCost(saved.optimizeCost === true && saved.algorithm === "backtracking");
     setScenario(saved.scenario);
     setResult(saved.result);
     const selectedExists = saved.result?.domain_inspection.some((item) => item.variable === saved.selectedVariable);
@@ -91,7 +93,7 @@ export default function Lab2Dashboard() {
     if (!scenario) return;
     setLoading("solve"); setError(null);
     try {
-      const data = await solveLab2Scenario(scenario, algorithm);
+      const data = await solveLab2Scenario(scenario, algorithm, optimizeCost);
       setResult(data); setSelectedVariable(data.domain_inspection[0]?.variable ?? "");
       setPlayStep(0); setPlaying(true);
     } catch (requestError) { setError(readableApiError(requestError)); }
@@ -106,6 +108,7 @@ export default function Lab2Dashboard() {
         version: 1,
         config,
         algorithm,
+        optimizeCost,
         scenario,
         result,
         selectedVariable,
@@ -145,7 +148,8 @@ export default function Lab2Dashboard() {
           <label>Deterministic seed<input type="number" value={config.seed} onChange={(event) => setConfig({ ...config, seed: Number(event.target.value) })} /></label>
           <button className="lab2-primary" disabled={loading !== null} onClick={generate}><RefreshCw size={15} className={loading === "generate" ? "spin" : ""} /> Generate scenario</button>
           <hr />
-          <label>Solver<select value={algorithm} onChange={(event) => setAlgorithm(event.target.value as CSPAlgorithm)}>{algorithms.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+          <label>Solver<select value={algorithm} onChange={(event) => { const next = event.target.value as CSPAlgorithm; setAlgorithm(next); if (next !== "backtracking") setOptimizeCost(false); }}>{algorithms.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+          {algorithm === "backtracking" && <label className="cost-objective-toggle"><span><input type="checkbox" checked={optimizeCost} onChange={(event) => setOptimizeCost(event.target.checked)} /> Prove minimum dispatch cost</span><small>Branch-and-bound explores beyond the first solution and can take longer.</small></label>}
           <button className="lab2-primary" disabled={!scenario || loading !== null} onClick={solve}><Play size={15} /> Solve & simulate</button>
           <button className="lab2-secondary" disabled={!scenario || loading !== null} onClick={compare}><BrainCircuit size={15} /> Compare all solvers</button>
           <p className="lab2-help">Opens a separate three-map comparison page using this exact frozen scenario.</p>
@@ -156,11 +160,12 @@ export default function Lab2Dashboard() {
             <div><span>Incidents</span><strong>{scenario?.summary.incidents ?? "—"}</strong></div>
             <div><span>CSP variables</span><strong>{scenario?.summary.requirements ?? "—"}</strong></div>
             <div><span>Available resources</span><strong>{scenario ? `${scenario.summary.available_resources}/${scenario.summary.resources}` : "—"}</strong></div>
+            <div><span>Receiving beds</span><strong>{scenario ? `${scenario.summary.available_beds ?? 0}/${scenario.summary.total_beds ?? 0}` : "—"}</strong></div>
             <div><span>Allocated</span><strong>{result ? `${result.requirements_allocated}/${result.requirements_total}` : "—"}</strong></div>
             <div><span>Violations</span><strong>{result?.constraint_violations ?? "—"}</strong></div>
           </div>
           <div className="lab2-map-head"><div><span className="eyebrow">Shared Lab‑1 road graph</span><h2>Live dispatch allocation</h2></div>{scenario && <span className="lab2-scenario-id">{scenario.scenario_id}</span>}</div>
-          <EmergencyMap centers={scenario?.centers ?? []} incidents={scenario?.incidents ?? []} allocations={visibleAllocations} activeCenterId={currentAllocation?.center_id} activeIncidentId={currentAllocation?.incident_id} />
+          <EmergencyMap centers={scenario?.centers ?? []} facilities={scenario?.facilities ?? []} incidents={scenario?.incidents ?? []} allocations={visibleAllocations} activeCenterId={currentAllocation?.center_id} activeIncidentId={currentAllocation?.incident_id} />
           <div className="lab2-playback">
             <button disabled={!result} onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"}</button>
             <button disabled={!result} onClick={() => { setPlayStep(0); setPlaying(true); }}>Replay</button>
@@ -178,6 +183,7 @@ export default function Lab2Dashboard() {
               <i><span>{(currentAllocation.distance_m / 1000).toFixed(2)} km</span><em>to incident</em></i>
               <article><b>🚨</b><span>Emergency incident</span><strong>{currentAllocation.incident_id}</strong><small>{label(currentAllocation.incident_type)} · severity {currentAllocation.severity}</small></article>
               <article className="step-valid"><b>✓</b><span>Constraint check</span><strong>Valid allocation</strong><small>Deadline {currentAllocation.deadline_minutes} min</small></article>
+              {currentAllocation.receiving_facility_id && <article className="step-facility"><b>🏥</b><span>Receiving facility</span><strong>{currentAllocation.receiving_facility_id}</strong><small>{currentAllocation.facility_travel_time_minutes?.toFixed(1)} min after pickup</small></article>}
             </div> : <p>Select Solve &amp; simulate, then use Previous or Next step to inspect each fleet dispatch and station.</p>}
           </div>
         </section>
@@ -185,7 +191,7 @@ export default function Lab2Dashboard() {
         <aside className="lab2-panel lab2-metrics">
           <div><span className="eyebrow">Solver telemetry</span><h2>{result ? label(result.algorithm) : "Waiting for solve"}</h2></div>
           {result ? <>
-            <div className={`lab2-status ${result.solution_found ? "ok" : "warn"}`}><Activity size={18} /><div><strong>{result.solution_found ? "Consistent allocation" : "Partial / unsatisfied"}</strong><span>{result.failure_reason ?? `${result.metrics.runtime_ms.toFixed(2)} ms backend runtime`}</span></div></div>
+            <div className={`lab2-status ${result.solution_found ? "ok" : "warn"}`}><Activity size={18} /><div><strong>{result.analysis.cost_optimized ? "Globally minimum-cost consistent allocation" : result.solution_found ? "Consistent allocation" : "Partial / unsatisfied"}</strong><span>{result.failure_reason ?? `${result.metrics.runtime_ms.toFixed(2)} ms backend runtime${result.analysis.cost_optimized ? " · branch-and-bound optimality proven" : ""}`}</span></div></div>
             <dl>
               <div><dt>Domain values pruned</dt><dd>{number(result.metrics.domain_values_pruned)}</dd></div>
               <div><dt>Arc revisions (AC‑3)</dt><dd>{number(result.metrics.arc_revisions)}</dd></div>
@@ -206,8 +212,13 @@ export default function Lab2Dashboard() {
         <div className="fleet-station-grid">{scenario.centers.map((center) => { const fleet = scenario.resources.filter((resource) => resource.center_id === center.id); const available = fleet.filter((resource) => resource.available).length; return <article key={center.id} className={currentAllocation?.center_id === center.id ? "active" : ""}><b>{fleetSymbols[center.center_type] ?? "🚨"}</b><div><strong>{center.name}</strong><span>{label(center.center_type)}</span></div><output>{available}<small> / {fleet.length} ready</small></output><div className="fleet-readiness"><i style={{ width: `${fleet.length ? available / fleet.length * 100 : 0}%` }} /></div></article>; })}</div>
       </section>}
 
+      {scenario && <section className="lab2-panel receiving-facilities-panel">
+        <div className="fleet-panel-heading"><div><span className="eyebrow">Receiving care capacity</span><h2>Emergency and burn-unit bed availability</h2></div><p>Ambulance requirements reserve a compatible reachable bed before vehicle search.</p></div>
+        <div className="receiving-facility-grid">{(scenario.facilities ?? []).map((facility) => <article key={facility.id}><b>🏥</b><div><strong>{facility.name}</strong><span>{facility.capabilities.map(label).join(" · ")}</span></div><output>{facility.available_beds}<small> / {facility.total_beds} beds</small></output><div><i style={{ width: `${facility.total_beds ? facility.available_beds / facility.total_beds * 100 : 0}%` }} /></div></article>)}</div>
+      </section>}
+
       {result && <section className="lab2-inspection-grid">
-        <div className="lab2-panel lab2-inspector"><div><span className="eyebrow">Domain inspector</span><h2>Why candidates were removed</h2></div><select value={inspection?.variable ?? ""} onChange={(event) => setSelectedVariable(event.target.value)}>{result.domain_inspection.map((item) => <option key={item.variable} value={item.variable}>{item.variable}</option>)}</select>{inspection && <><div className="domain-counts"><span>Initial candidates <strong>{inspection.before.length}</strong></span><span>Removed by constraints <strong>{inspection.removed.length}</strong></span><span>Feasible after AC-3 <strong>{inspection.after.length}</strong></span></div><div className="domain-retention"><div><i style={{ width: `${inspection.before.length ? inspection.after.length / inspection.before.length * 100 : 0}%` }} /></div><span>{inspection.before.length ? Math.round(inspection.after.length / inspection.before.length * 100) : 0}% of candidates remain feasible</span></div><p className="domain-reason-label">Removed resource → hard-constraint reason</p><ul>{inspection.removed.slice(0, 12).map((item) => <li key={item.resource_id}><strong>{item.resource_id}</strong><span>{item.reason}</span></li>)}</ul>{inspection.removed.length > 12 && <p className="lab2-help">+ {inspection.removed.length - 12} more removed candidates</p>}<p className="lcv-copy"><strong>LCV value order:</strong> {inspection.lcv_order.slice(0, 8).join(" → ") || (result.algorithm === "local_search" ? "Not used by Min-Conflicts" : "Variable was not visited before the solution completed")}</p></>}</div>
+        <div className="lab2-panel lab2-inspector"><div><span className="eyebrow">Domain inspector</span><h2>Why candidates were removed</h2></div><select value={inspection?.variable ?? ""} onChange={(event) => setSelectedVariable(event.target.value)}>{result.domain_inspection.map((item) => <option key={item.variable} value={item.variable}>{item.variable}</option>)}</select>{inspection && <><div className="domain-counts"><span>Initial candidates <strong>{inspection.before.length}</strong></span><span>Removed by constraints <strong>{inspection.removed.length}</strong></span><span>Feasible after AC-3 <strong>{inspection.after.length}</strong></span></div>{inspection.receiving_facility && <p className="receiving-facility-choice"><strong>Reserved receiving facility:</strong> {inspection.receiving_facility}</p>}<div className="domain-retention"><div><i style={{ width: `${inspection.before.length ? inspection.after.length / inspection.before.length * 100 : 0}%` }} /></div><span>{inspection.before.length ? Math.round(inspection.after.length / inspection.before.length * 100) : 0}% of candidates remain feasible</span></div><p className="domain-reason-label">Removed resource → hard-constraint reason</p><ul>{inspection.removed.slice(0, 12).map((item) => <li key={item.resource_id}><strong>{item.resource_id}</strong><span>{item.reason}</span></li>)}</ul>{inspection.removed.length > 12 && <p className="lab2-help">+ {inspection.removed.length - 12} more removed candidates</p>}<p className="lcv-copy"><strong>LCV value order:</strong> {inspection.lcv_order.slice(0, 8).join(" → ") || (result.algorithm === "local_search" ? "Not used by Min-Conflicts" : "Variable was not visited before the solution completed")}</p></>}</div>
         <div className="lab2-panel lab2-trace"><div><span className="eyebrow">Search explanation</span><h2>How the solver reached this result</h2></div><Lab2SearchVisual result={result} /></div>
       </section>}
 
@@ -224,9 +235,9 @@ export default function Lab2Dashboard() {
 
       {result && <section className="lab2-panel lab2-allocation-table">
         <div><span className="eyebrow">Real solver output</span><h2>Allocation and failure details</h2></div>
-        <div className="lab2-table-scroll"><table><thead><tr><th>Requirement</th><th>Resource</th><th>Type</th><th>Response</th><th>Distance</th><th>Status</th></tr></thead><tbody>
-          {result.allocations.slice(0, 30).map((item) => <tr key={item.variable}><td>{item.variable}</td><td>{item.resource_id}</td><td>{label(item.resource_type)}</td><td>{item.travel_time_minutes} min</td><td>{number(item.distance_m)} m</td><td><span className="allocation-ok">Allocated</span></td></tr>)}
-          {result.unallocated.slice(0, 30).map((item) => <tr key={item.variable}><td>{item.variable}</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span className="allocation-failed">{item.reason}</span></td></tr>)}
+        <div className="lab2-table-scroll"><table><thead><tr><th>Requirement</th><th>Resource</th><th>Type</th><th>Response</th><th>Distance</th><th>Receiving facility</th><th>Cost</th><th>Status</th></tr></thead><tbody>
+          {result.allocations.slice(0, 30).map((item) => <tr key={item.variable}><td>{item.variable}</td><td>{item.resource_id}</td><td>{label(item.resource_type)}</td><td>{item.travel_time_minutes} min</td><td>{number(item.distance_m)} m</td><td>{item.receiving_facility_id ?? "Not required"}</td><td>৳{number(item.estimated_cost)}</td><td><span className="allocation-ok">Allocated</span></td></tr>)}
+          {result.unallocated.slice(0, 30).map((item) => <tr key={item.variable}><td>{item.variable}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span className="allocation-failed">{item.reason}</span></td></tr>)}
         </tbody></table></div>
         {(result.allocations.length + result.unallocated.length) > 60 && <p className="lab2-help">Showing the first 30 allocated and 30 unallocated requirements.</p>}
       </section>}

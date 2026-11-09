@@ -69,6 +69,9 @@ def test_mrv_uses_degree_before_project_severity_tie_breaker():
         "NEIGHBOR": ["R3", "R5", "R6"],
     }, {"HIGH": 5, "DEGREE": 1, "NEIGHBOR": 1})
     assert select_unassigned_variable(item, {}) == "DEGREE"
+    assert item.selection_trace[0]["selected"] == "DEGREE"
+    assert item.selection_trace[0]["legal_values"] == 2
+    assert item.selection_trace[0]["dynamic_degree"] == 1
 
 
 def test_lcv_prefers_value_with_fewer_neighbor_eliminations():

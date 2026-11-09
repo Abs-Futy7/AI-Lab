@@ -17,6 +17,10 @@ export interface Lab2Point { lat: number; lng: number }
 export interface Lab2Center {
   id: string; name: string; center_type: string; latitude: number; longitude: number;
 }
+export interface Lab2Facility {
+  id: string; name: string; latitude: number; longitude: number;
+  capabilities: string[]; total_beds: number; available_beds: number;
+}
 export interface Lab2Incident {
   id: string; type: string; latitude: number; longitude: number; severity: number;
   deadline_minutes: number; budget: number; required_resources: Record<string, number>;
@@ -31,8 +35,9 @@ export interface Lab2Scenario {
   incidents: Lab2Incident[];
   resources: Lab2Resource[];
   centers: Lab2Center[];
+  facilities: Lab2Facility[];
   assumptions: string[];
-  summary: { incidents: number; requirements: number; resources: number; available_resources: number };
+  summary: { incidents: number; requirements: number; resources: number; available_resources: number; facilities?: number; available_beds?: number; total_beds?: number };
 }
 export interface Lab2Metrics {
   initial_domain_values: number; final_domain_values: number; domain_values_pruned: number;
@@ -47,11 +52,19 @@ export interface Lab2Allocation {
   deadline_minutes: number; resource_id: string; resource_type: string; center_id: string;
   source: Lab2Point; destination: Lab2Point; distance_m: number;
   travel_time_minutes: number; estimated_cost: number; route: Lab2Point[];
+  receiving_facility_id?: string | null; facility_travel_time_minutes?: number;
+  facility_distance_m?: number; facility_route?: Lab2Point[];
 }
 export interface DomainInspection {
   variable: string; incident_id: string; incident_type: string; severity: number;
   deadline_minutes: number; required_resource: string; before: string[];
   removed: Array<{ resource_id: string; reason: string }>; after: string[]; lcv_order: string[];
+  receiving_facility?: string | null;
+}
+export interface SelectionTraceItem {
+  step: number; depth: number; selected: string; legal_values: number;
+  dynamic_degree: number; severity: number; reason: string;
+  alternatives: Array<{ variable: string; legal_values: number; dynamic_degree: number; severity: number }>;
 }
 export interface Lab2Result {
   scenario_id: string; algorithm: CSPAlgorithm; solution_found: boolean; solution_status: string;
@@ -60,10 +73,11 @@ export interface Lab2Result {
   constraint_violations: number; allocations: Lab2Allocation[];
   unallocated: Array<{ variable: string; incident_id: string; reason: string }>;
   metrics: Lab2Metrics;
-  analysis: { average_response_time: number; average_distance_m: number; total_dispatch_cost: number };
+  analysis: { average_response_time: number; average_distance_m: number; total_dispatch_cost: number; cost_optimized?: boolean; optimal_cost?: number | null; objective?: string };
   domain_inspection: DomainInspection[];
   backjump_trace: Array<Record<string, unknown>>;
   conflict_history: number[];
+  selection_trace: SelectionTraceItem[];
 }
 export interface Lab2Comparison {
   scenario_id: string; same_scenario: boolean; results: Record<CSPAlgorithm, Lab2Result>;

@@ -13,6 +13,8 @@ BASE_REQUIREMENTS: dict[IncidentType, dict[ResourceType, int]] = {
     IncidentType.fire: {ResourceType.fire_unit: 1},
     IncidentType.road_accident: {ResourceType.ambulance: 1},
     IncidentType.flood_rescue: {ResourceType.rescue_team: 1},
+    IncidentType.earthquake: {ResourceType.rescue_team: 1},
+    IncidentType.pit_rescue: {ResourceType.rescue_team: 1, ResourceType.ambulance: 1},
 }
 
 SEVERE_EXTRA_REQUIREMENTS: dict[IncidentType, dict[ResourceType, int]] = {
@@ -20,6 +22,8 @@ SEVERE_EXTRA_REQUIREMENTS: dict[IncidentType, dict[ResourceType, int]] = {
     IncidentType.fire: {ResourceType.ambulance: 1},
     IncidentType.road_accident: {ResourceType.rescue_team: 1},
     IncidentType.flood_rescue: {ResourceType.ambulance: 1},
+    IncidentType.earthquake: {ResourceType.ambulance: 1},
+    IncidentType.pit_rescue: {},
 }
 
 SCALE_REQUESTS = {
@@ -43,8 +47,10 @@ DEADLINE_MINUTES = {
 }
 
 INCIDENT_WEIGHTS = {
-    IncidentType.medical: 0.34,
-    IncidentType.fire: 0.21,
-    IncidentType.road_accident: 0.27,
-    IncidentType.flood_rescue: 0.18,
+    IncidentType.medical: 0.26,
+    IncidentType.fire: 0.18,
+    IncidentType.road_accident: 0.22,
+    IncidentType.flood_rescue: 0.14,
+    IncidentType.earthquake: 0.12,
+    IncidentType.pit_rescue: 0.08,
 }

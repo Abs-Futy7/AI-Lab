@@ -28,11 +28,12 @@ export async function generateLab2Scenario(request: Lab2GenerateRequest): Promis
 export async function solveLab2Scenario(
   scenario: Lab2Scenario,
   algorithm: CSPAlgorithm,
+  optimizeCost = false,
 ): Promise<Lab2Result> {
   const { data } = await client.post<Lab2Result>("/api/lab2/solve", {
     scenario_id: scenario.scenario_id,
     scenario: { ...scenario, id: scenario.scenario_id },
-    algorithm, debug: true, local_search_max_steps: 3000,
+    algorithm, debug: true, local_search_max_steps: 3000, optimize_cost: optimizeCost,
   });
   return data;
 }

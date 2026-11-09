@@ -25,7 +25,10 @@ def test_generate_then_solve_same_small_scenario():
     assert generated.status_code == 200
     scenario = generated.json()
     assert scenario["summary"]["incidents"] == 3
-    assert len(scenario["centers"]) == 6
+    assert len(scenario["centers"]) == 9
+    assert sum(center["center_type"] == "AMBULANCE" for center in scenario["centers"]) == 5
+    assert len(scenario["facilities"]) == 4
+    assert scenario["summary"]["available_beds"] > 0
 
     solved = client.post("/api/lab2/solve", json={
         "scenario_id": scenario["scenario_id"], "algorithm": "backtracking",
@@ -37,6 +40,24 @@ def test_generate_then_solve_same_small_scenario():
     assert result["requirements_total"] == scenario["summary"]["requirements"]
     resource_ids = [item["resource_id"] for item in result["allocations"]]
     assert len(resource_ids) == len(set(resource_ids))
+    assert result["selection_trace"]
+
+
+def test_backtracking_can_prove_minimum_dispatch_cost():
+    scenario = client.post("/api/lab2/scenario/generate", json={
+        "scale": "custom", "request_count": 2, "seed": 91,
+        "deadline_policy": "relaxed", "resource_availability": "high",
+    }).json()
+    response = client.post("/api/lab2/solve", json={
+        "scenario_id": scenario["scenario_id"],
+        "algorithm": "backtracking",
+        "optimize_cost": True,
+    })
+    assert response.status_code == 200
+    result = response.json()
+    assert result["analysis"]["cost_optimized"] is True
+    assert result["analysis"]["objective"] == "minimum_total_dispatch_cost"
+    assert result["analysis"]["optimal_cost"] == result["analysis"]["total_dispatch_cost"]
 
 
 def test_unknown_scenario_is_clear_404():

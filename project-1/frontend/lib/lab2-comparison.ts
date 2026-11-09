@@ -7,6 +7,7 @@ export interface Lab2WorkspaceSnapshot {
   version: 1;
   config: Lab2GenerateRequest;
   algorithm: CSPAlgorithm;
+  optimizeCost?: boolean;
   scenario: Lab2Scenario;
   result: Lab2Result | null;
   selectedVariable: string;
@@ -62,6 +63,7 @@ export function readLab2Workspace(): Lab2WorkspaceSnapshot | null {
       version: 1,
       config: value.config as unknown as Lab2GenerateRequest,
       algorithm: value.algorithm as CSPAlgorithm,
+      optimizeCost: value.optimizeCost === true,
       scenario: value.scenario,
       result,
       selectedVariable: typeof value.selectedVariable === "string" ? value.selectedVariable : "",
@@ -79,6 +81,7 @@ export function saveLab2Workspace(snapshot: Lab2WorkspaceSnapshot): "full" | "vi
     domain_inspection: [],
     backjump_trace: [],
     conflict_history: [],
+    selection_trace: [],
   } : null;
   const attempts: Array<{ level: "full" | "visual" | "scenario"; value: Lab2WorkspaceSnapshot }> = [
     { level: "full", value: snapshot },

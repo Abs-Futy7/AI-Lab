@@ -84,7 +84,7 @@ The slide also discusses node, path, and general `k`-consistency. This project p
 | Four required emergency categories | ✅ Complete | `MEDICAL`, `FIRE`, `ROAD_ACCIDENT`, `FLOOD_RESCUE` |
 | Multiple simultaneous requests | ✅ Complete | 30/100/300 presets plus custom 1–300 incident count |
 | Multiple physical resource types and counts | ✅ Complete | Ambulance, fire unit, rescue team; scale/availability-based fleets with unique IDs |
-| Fixed resource starting points | ✅ Complete | Six fixed Dhaka teaching centers: two per resource type |
+| Fixed resource starting points | ✅ Expanded | Nine fixed Dhaka teaching centers: five ambulance hospitals, two fire stations, and two rescue bases |
 | One incident may require multiple units/types | ✅ Complete | Severity 4–5 fire adds ambulance; accident adds rescue; flood rescue adds ambulance |
 | CSP `(X,D,C)` formulation | ✅ Complete | Requirement-slot variables, feasible physical-resource domains, unary filters, pairwise `Alldiff` |
 | Road availability and blocked roads | ✅ Complete | Shared Lab 1 graph with normal, some-blocked, and heavy-disruption scenarios |
@@ -92,10 +92,10 @@ The slide also discusses node, path, and general `k`-consistency. This project p
 | Distance consideration | ✅ Complete | A* road distance is stored and shown for each allocation |
 | Resource availability | ✅ Complete | High/normal/shortage fleet policies and per-resource availability filtering |
 | Capacity/capability | ✅ Complete | Resource capacity must satisfy severity-derived required capacity |
-| Cost/budget boundary | ✅ Complete | `dispatch_cost + 45 × distance_km`; over-budget candidate removed |
+| Cost/budget boundary | ✅ Complete + optional optimum | Over-budget candidates are removed; Backtracking can additionally prove global minimum total dispatch cost with branch-and-bound |
 | Severity/prioritization | ✅ Complete within stated design freedom | Severity tightens deadline, raises capacity, adds resources, and breaks MRV/Degree ties |
 | AC-3 before search | ✅ Complete | Shared queue-based AC-3 runs before Backtracking, CBJ, and Min-Conflicts |
-| Variable/value ordering | ✅ Implemented | MRV/MCV → dynamic Degree → severity → stable ID; LCV → travel time → resource ID |
+| Variable/value ordering | ✅ Implemented and visible | MRV/MCV → dynamic Degree → severity → stable ID; LCV → travel time → resource ID; chronological decision evidence is shown in the UI |
 | Backtracking | ✅ Complete | Recursive exact solver with Forward Checking and reversible domain restoration |
 | Conflict-Directed Backjumping | ✅ Complete | Explicit conflict sets, skipped variables, jump target, count, distance, and UI trace |
 | Local Search | ✅ Complete | Seeded Min-Conflicts with repair steps and conflict-history graph |
@@ -104,32 +104,30 @@ The slide also discusses node, path, and general `k`-consistency. This project p
 | Show allocation on the map | ✅ Complete | Center/resource → incident road routes, playback, allocation table, and per-step evidence |
 | Extend rather than remove Lab 1 | ✅ Complete | Lab 1 remains separate; Lab 2 reuses its Dhaka road graph, disruptions, and A* route evidence |
 
-### যা আংশিক বা optional improvement
+### Optional improvements এখন যেভাবে implement করা হয়েছে
 
-Core assignment-এর কোনো required algorithm missing নেই। তবে examiner-facing clarity আরও বাড়াতে নিচের improvement করা যেতে পারে:
+Core assignment আগে থেকেই complete ছিল। Teacher-audit-এর পাঁচটি optional extension এখন একে একে যোগ করা হয়েছে:
 
-1. **Exact MRV selection sequence:** backend এখন `mrv_selections` count রাখে এবং UI pipeline/count দেখায়, কিন্তু প্রতিটি recursive step-এ কোন variable কেন select হলো—তার chronological trace সংরক্ষণ করে না। LCV order per variable দেখা যায়। শিক্ষক যদি “প্রতিটি ordering step live দেখাও” বোঝান, তাহলে MRV/Degree decision trace একটি useful addition হবে।
-2. **আরও ambulance locations:** শিক্ষক পাঁচটি ambulance point উদাহরণ দিয়েছিলেন; project-এ দুইটি ambulance hospital, দুইটি fire station, এবং দুইটি rescue base আছে। তিনি initialization flexible এবং secondary বলেছেন, তাই এটি correctness gap নয়। Demo geography সমৃদ্ধ করতে চাইলে আরও তিনটি ambulance center যোগ করা যায়।
-3. **Hospital/burn-unit availability:** vehicle/resource availability আছে, কিন্তু hospital bed বা burn-unit capacity আলাদা entity হিসেবে model করা হয়নি। শিক্ষক এটিকে possible constraint-এর example হিসেবে বলেছেন, required core list হিসেবে নয়।
-4. **Aggregate incident budget:** বর্তমান budget প্রতিটি requirement candidate-এর feasibility check করে; multi-resource incident-এর combined shared budget optimize করে না। শিক্ষক optimal solution চাননি—CSP satisfaction চেয়েছেন—তাই এটি documented design choice।
-5. **Separate earthquake/pit-rescue labels:** earthquake বা শিশুকে গর্ত থেকে rescue ছিল motivating example। Required চার category project-এ exact আছে; ওই extra examples বর্তমানে `FLOOD_RESCUE`/rescue-team behavior দিয়ে abstract করা হয়।
+1. **Exact MRV/Degree trace:** প্রতিটি exact-search selection-এ step, recursion depth, selected variable, current legal-value count, dynamic degree, severity, এবং next three alternatives backend-এ record হয়। UI এই evidence সরাসরি দেখায়; browser result থেকে ordering অনুমান করে না। Trace 120 decision-এ capped, UI first 18 দেখায়, যাতে large scenario-তে payload manageable থাকে।
+2. **Five ambulance locations:** Green Life ও BSMMU-এর সঙ্গে Dhaka Medical College, Square Hospital, এবং Holy Family Red Crescent ambulance center যোগ হয়েছে। Fire এবং rescue-এর দুইটি করে center আগের মতো আছে—মোট নয়টি dispatch center। Fleet IDs এই center-গুলোর মধ্যে round-robin distribute হয়।
+3. **Hospital/burn-unit availability:** চারটি receiving facility এখন আলাদা scenario entity। প্রতিটির capability (`EMERGENCY`/`BURN_UNIT`), total beds, এবং seeded available beds আছে। Ambulance requirement-গুলো severity descending, tighter deadline, তারপর stable ID order-এ compatible reachable bed reserve করে। Fire ambulance-এর জন্য burn unit দরকার; অন্য ambulance response-এর জন্য emergency bed দরকার। Bed না থাকলে ambulance candidate domain থেকে বাদ যায়। Map-এ red dashed incident-to-facility route এবং bed-readiness cards দেখা যায়।
+4. **Global minimum-cost extension:** Backtracking select করলে optional **Prove minimum dispatch cost** switch পাওয়া যায়। এটি first solution-এ থামে না; MRV/Degree variable ordering রেখে cost-ordered values, incumbent best cost, এবং optimistic remaining-cost lower bound দিয়ে branch-and-bound চালায়। Search শেষ হলে returned complete assignment-এর minimum total dispatch cost mathematically proven হয়। Lecture comparison-এর original Backtracking/CBJ/Min-Conflicts mode unchanged থাকে।
+5. **Earthquake and pit rescue:** `EARTHQUAKE` এবং `PIT_RESCUE` এখন আলাদা generated incident category ও map icon। Earthquake base requirement rescue team, severe হলে ambulance-ও লাগে। Pit rescue সবসময় rescue team + ambulance চায়। Original four required categories এখনও আছে।
 
 ### Bottom-line verdict
 
-বর্তমান Lab 2 project শিক্ষকের **সব core requirement পূরণ করে**: city-map control center, four incident classes, multiple fixed resources, multiple-resource incidents, real road feasibility, time/cost/capacity/availability constraints, AC-3, MRV/Degree/LCV, Backtracking, conflict-directed Backjumping, Min-Conflicts, interactive allocation, এবং same-scenario comparison।
-
-এখন সবচেয়ে মূল্যবান next addition নতুন solver নয়; বরং actual **MRV/Degree selection trace** দৃশ্যমান করা। এটি implementation correctness বদলাবে না, কিন্তু “heuristic কীভাবে apply হচ্ছে” examiner-এর সামনে আরও সরাসরি প্রমাণ করবে।
+বর্তমান Lab 2 project শিক্ষকের **সব core requirement এবং teacher-audit-এর পাঁচটি optional extension পূরণ করে**: city-map control center, six incident classes, nine fixed dispatch centers, hospital/burn-bed reservation, multiple-resource incidents, real road feasibility, time/cost/capacity/availability constraints, AC-3, visible MRV/Degree/LCV evidence, Backtracking, conflict-directed Backjumping, Min-Conflicts, optional minimum-cost branch-and-bound, interactive allocation, এবং same-scenario comparison।
 
 ### Evaluation-এর সময় কীভাবে দেখাবেন
 
 1. Small বা custom scenario generate করে Incidents এবং CSP variables আলাদা কেন দেখান।
 2. Road scenario `Some roads blocked`, resource availability `Shortage`, এবং strict deadline বেছে constraints visible করুন।
-3. Backtracking solve করে Domain Inspector-এ removed reason, AC-3 remaining domain, এবং LCV order দেখান।
+3. Backtracking solve করে Domain Inspector-এ removed reason, reserved facility, AC-3 remaining domain, এবং LCV order দেখান। Search explanation-এ actual MRV/Degree decision cards দেখান।
 4. Step visualizer দিয়ে center → selected resource → route → incident → deadline-valid allocation দেখান।
 5. CBJ run-এ conflict set, skipped variables, and jump target দেখান; easy run-এ jump না হলে harder/shortage scenario ব্যবহার করুন।
 6. Min-Conflicts run-এ initial/final conflicts, repair steps, এবং conflict-history graph দেখান।
 7. Compare All খুলে identical scenario-র তিনটি map, allocation/effort table, recommendation, এবং bottom route-difference map দেখান।
-8. শেষে বলুন: এটি minimum-cost optimizer নয়; complete consistent allocation primary goal, আর cost/response comparison evidence।
+8. শেষে satisfaction Backtracking এবং optional **Prove minimum dispatch cost** mode-এর পার্থক্য দেখান: প্রথমটি first complete solution-এ থামে; দ্বিতীয়টি branch-and-bound দিয়ে optimality prove করে।
 
 ## What happens when the project runs
 
@@ -191,7 +189,7 @@ The availability policy changes fleet size and individual availability:
 | Normal | `1.00` | `0.08` |
 | Shortage | `0.55` | `0.18` |
 
-Incident types are sampled with documented weights: medical `0.34`, road accident `0.27`, fire `0.21`, and flood rescue `0.18`. Severity is from 1 to 5 with weights `8, 18, 30, 26, 18`; it is therefore simulated but not uniformly random.
+Incident types are sampled with documented weights: medical `0.26`, road accident `0.22`, fire `0.18`, flood rescue `0.14`, earthquake `0.12`, and pit rescue `0.08`. Severity is from 1 to 5 with weights `8, 18, 30, 26, 18`; it is therefore simulated but not uniformly random.
 
 ### How incident type becomes required resources
 
@@ -201,6 +199,8 @@ Incident types are sampled with documented weights: medical `0.34`, road acciden
 | Fire | 1 fire unit | 1 ambulance |
 | Road accident | 1 ambulance | 1 rescue team |
 | Flood rescue | 1 rescue team | 1 ambulance |
+| Earthquake | 1 rescue team | 1 ambulance |
+| Pit rescue | 1 rescue team + 1 ambulance | None |
 
 Required capacity is `max(1, severity)`. A severity-5 requirement therefore rejects a compatible vehicle whose capacity is below 5.
 
@@ -233,7 +233,28 @@ This means the selected candidate geometry is the shortest traversable road-dist
 
 The A* routing subproblem uses the project's admissible ALT landmark lower bound internally. That A* heuristic finds a road route efficiently; it is separate from the CSP assignment heuristics described later.
 
-All resources stationed at the same center share the same start coordinate. The backend therefore caches a route by `(center_id, incident_id)`. It does **not** run an identical A* search once for every ambulance ID. With two centers for each resource type, an ordinary single-type incident needs at most two distinct center-to-incident route calculations; a severe two-type incident can need up to four. Physical resource IDs remain separate domain values because availability, capacity, base dispatch cost, and uniqueness can differ even when route geometry is shared.
+All resources stationed at the same center share the same start coordinate. The backend therefore caches a route by `(center_id, incident_id)`. It does **not** run an identical A* search once for every ambulance ID. There are now five ambulance centers, two fire centers, and two rescue centers. A single ambulance requirement therefore needs at most five distinct center-to-incident calculations; fire/rescue needs at most two. Physical resource IDs remain separate domain values because availability, capacity, base dispatch cost, and uniqueness can differ even when route geometry is shared.
+
+### Receiving hospital and burn-unit preprocessing
+
+Receiving care is modeled separately from dispatch vehicles. Every generated scenario contains four fixed teaching facilities with seeded bed readiness:
+
+| Facility | Capability |
+|---|---|
+| Dhaka Medical College Emergency | Emergency |
+| BSMMU Emergency | Emergency |
+| Green Life Emergency | Emergency |
+| Sheikh Hasina National Burn Institute | Emergency + Burn unit |
+
+Bed totals scale with the incident preset; high/normal/shortage availability applies `0.95`, `0.75`, or `0.35` readiness before a seeded variation. Before resource-domain construction, ambulance variables are ordered by:
+
+```text
+higher severity -> tighter deadline -> stable variable ID
+```
+
+For each variable, the backend finds reachable compatible facilities with a remaining bed, chooses the lowest incident-to-facility travel time, and decrements the remaining bed count. A fire-related ambulance requires `BURN_UNIT`; other ambulance requirements require `EMERGENCY`. This produces a deterministic, non-overbooked facility plan.
+
+If no compatible bed or route remains, every ambulance value for that requirement is removed with `no compatible receiving-hospital bed available`. Otherwise the candidate stores the receiving-facility ID, patient-transport route, distance, and time. The map draws dispatch center → incident as the normal resource-colored line and incident → receiving facility as a red dashed line.
 
 ### How response time is calculated
 
@@ -267,7 +288,10 @@ Each generated resource receives a base dispatch cost with a seeded `0.90` to `1
 For a specific candidate:
 
 ```text
-estimated_candidate_cost = resource.dispatch_cost + 45 * route_distance_km
+billable_distance_km = response_distance_km
+                       + ambulance_patient_transport_distance_km
+
+estimated_candidate_cost = resource.dispatch_cost + 45 * billable_distance_km
 ```
 
 The candidate is removed if this exceeds the incident budget. For a returned allocation:
@@ -277,13 +301,14 @@ total_dispatch_cost = sum(estimated_candidate_cost for every allocated requireme
 cost_per_allocation = total_dispatch_cost / allocated requirements
 ```
 
-Cost has three precise roles:
+Cost has four precise roles:
 
 1. **hard feasibility:** an over-budget candidate is removed;
 2. **reporting/comparison:** total cost and cost per allocation are displayed;
-3. **not a global objective:** the solver does not minimize the sum of all costs.
+3. **ordinary solver ordering:** satisfaction Backtracking, CBJ, and Min-Conflicts do not claim global cost optimality;
+4. **optional exact objective:** Backtracking's branch-and-bound mode proves the minimum total cost among complete consistent assignments.
 
-LCV first protects neighboring domain flexibility, then uses travel time—not dispatch cost—as a tie-break. Consequently, a valid solution can be more expensive than another valid solution. Turning “find any complete consistent assignment” into “find the cheapest complete consistent assignment” would require a Constraint Optimization Problem method such as branch-and-bound or weighted CSP search.
+LCV first protects neighboring domain flexibility, then uses travel time—not dispatch cost—as a tie-break. Consequently, ordinary satisfaction mode can return a valid solution that is more expensive than another valid solution. The optional branch-and-bound extension changes the objective: it retains MRV/Degree variable selection, orders candidate values by estimated cost to obtain a good incumbent early, computes a safe optimistic lower bound for every unfinished branch, prunes any branch that cannot beat the incumbent, and continues until no cheaper complete assignment can exist.
 
 ### How an incident is considered responded to
 
@@ -295,6 +320,7 @@ An incident requirement is responded to only when its CSP variable receives a un
 - complete road-route coordinates;
 - road distance and estimated response time;
 - estimated dispatch cost and deadline.
+- reserved receiving-facility ID and patient-transport route when an ambulance is required.
 
 If one incident requires two resource types, both variables must be allocated for the full CSP to be complete. If one cannot be assigned, the result remains `partial_or_unsatisfied`; the independently feasible route may still be returned and animated as a partial operational response.
 
@@ -656,6 +682,7 @@ There is no universal winner. “Better” must name the criterion: completeness
 | Need to prove unsatisfiable | Backtracking or CBJ | Exhaustive exact search can establish failure under the finite model | Min-Conflicts failure is not proof |
 | Need a visible explanation of the main conflicting decisions | CBJ | Its trace identifies failed variable, conflict set, skipped variables, and jump target | A trace may be empty on an easy run with no real backjump |
 | Need reproducible fast repair demonstration | Min-Conflicts | Seed controls conflicted-variable choice; conflict history is visual | Different seeds can produce different repair paths |
+| Need a proven cheapest complete allocation | Minimum-cost Backtracking extension | Branch-and-bound exhaustively proves no cheaper complete assignment exists | Can be much slower than first-solution satisfaction search |
 
 ### When ordinary Backtracking can beat CBJ
 
@@ -675,6 +702,8 @@ The comparison page first prefers a complete allocation, then higher allocation 
 
 The three original solver maps remain separate. The bottom difference map then hides common assignments and shows only variables on which the selected resource differs or a solver leaves the requirement unallocated. It explains **where** the final solver decisions differ; it does not change or rerun any solver.
 
+The optional minimum-cost switch is intentionally outside Compare All. Compare All remains a fair comparison of the three Lecture-5 solver strategies under their normal satisfaction behavior. Branch-and-bound answers a different question—“which complete assignment is cheapest?”—and its larger runtime must not be mixed with first-solution runtime without labeling the changed objective.
+
 ## Function-by-function implementation map
 
 The following table connects the project behavior to the actual function responsible for it.
@@ -685,7 +714,9 @@ The following table connects the project behavior to the actual function respons
 | `scenario_generator.py::_resource_counts` | Applies scale and availability multiplier | Produces controllable normal/high/shortage experiments |
 | `scenario_generator.py::_make_resources` | Creates resource IDs, center, availability, capacity, and dispatch cost | Builds the finite value pool used by domains |
 | `scenario_generator.py::_make_incidents` | Samples node, type, severity, requirements, deadline, capacity, and budget | Builds reproducible CSP demand from one seed |
+| `scenario_generator.py::_make_facilities` | Scales and seeds emergency/burn bed readiness | Makes receiving-care capacity a visible scenario entity |
 | `csp/domains.py::_variables` | Expands each incident requirement count into named slots | One incident may require multiple simultaneous resources |
+| `csp/domains.py::_reserve_receiving_facilities` | Priority-orders ambulance requirements and reserves the nearest reachable compatible bed | Prevents hospital overbooking before vehicle assignment |
 | `routing_service.py::prepare_lab2_road_graph` | Applies the selected Lab 1 road scenario | Makes closures and disruptions part of candidate feasibility |
 | `routing_service.py::calculate_lab2_candidate_route` | Runs distance-based A*, returns route geometry, distance, and traffic-adjusted time | Supplies real road evidence for each candidate |
 | `csp/domains.py::build_problem` | Filters unary constraints, creates candidate metadata and the sparse neighbor graph | Converts emergency data into `(X, D, C)` |
@@ -694,11 +725,12 @@ The following table connects the project behavior to the actual function respons
 | `constraints.py::total_conflicts` | Counts duplicate-resource edges in a complete assignment | Supplies the Min-Conflicts objective |
 | `csp/ac3.py::revise` | Removes `Xi` values with no supporting different value in `Xj` | Implements the lecture's `REVISE` operation |
 | `ac3.py::enforce_arc_consistency` | Queues arcs and propagates revisions | Performs AC-3 preprocessing |
-| `csp/heuristics.py::select_unassigned_variable` | MRV, then Degree, severity, stable ID | Chooses the next exact-search variable fail-first |
+| `csp/heuristics.py::select_unassigned_variable` | MRV, then Degree, severity, stable ID; records decision evidence and alternatives | Chooses the next exact-search variable fail-first and explains why |
 | `heuristics.py::order_domain_values` | LCV, then response time, then ID | Preserves flexibility when trying resources |
 | `csp/backtracking.py::solve_backtracking` | Recursive assignment, Forward Checking, reversible domain restoration | Provides the standard complete exact solver |
 | `csp/backjumping.py::solve_backjumping` | Builds/propagates conflict sets and records non-chronological jumps | Skips decisions unrelated to a deeper failure |
 | `csp/local_search.py::solve_min_conflicts` | Creates a complete assignment and repeatedly repairs duplicate-resource conflicts | Provides fast, incomplete local search |
+| `csp/min_cost.py::solve_min_cost_backtracking` | Continues exact search with an incumbent and optimistic lower bound | Proves a globally minimum total dispatch cost when requested |
 | `lab2_service.py::_maximum_matchable_variables` | Finds a deterministic maximum-cardinality distinct-resource subset | Handles Hall/pigeonhole shortages binary AC-3 can miss |
 | `lab2_service.py::_solve_problem` | Runs AC-3, shortage handling, and selected solver | Keeps all algorithms on one consistent pipeline |
 | `lab2_service.py::_result_payload` | Validates uniqueness and converts assignments into allocations/unallocated evidence | Produces the exact API object visualized by the frontend |
@@ -1177,6 +1209,7 @@ If preprocessing finds no matchable requirement at all, the visual dashboard sup
 backend/app/
 |-- emergency/
 |   |-- models.py
+|   |-- facilities.py
 |   |-- presets.py
 |   |-- resource_centers.py
 |   `-- scenario_generator.py
@@ -1188,7 +1221,8 @@ backend/app/
 |   |-- heuristics.py
 |   |-- backtracking.py
 |   |-- backjumping.py
-|   `-- local_search.py
+|   |-- local_search.py
+|   `-- min_cost.py
 `-- services/lab2_service.py
 
 frontend/
@@ -1328,10 +1362,13 @@ A: Small-e 30, medium-e 100, large-e 300; custom-e user count. Kintu CSP variabl
 A: `sum(required_resources.values())`. Normal medical hole usually one ambulance variable. Severe fire hole one fire-unit variable plus one ambulance variable. Prottek slot independent CSP variable.
 
 **Q: Incident type-er probability ki equal?**
-A: Na. Medical 0.34, road accident 0.27, fire 0.21, flood rescue 0.18. Severity-o uniform na; weighted 1-to-5 distribution use kori. Ei values configuration, solver logic na.
+A: Na. Medical 0.26, road accident 0.22, fire 0.18, flood rescue 0.14, earthquake 0.12, and pit rescue 0.08. Severity-o uniform na; weighted 1-to-5 distribution use kori. Ei values configuration, solver logic na.
 
 **Q: Resource center koyta?**
-A: Six fixed educational center: two ambulance hospitals, two fire stations, two rescue bases. Physical resource onek, but same type-er resources oi two relevant center-er moddhe round-robin stationed.
+A: Nine fixed educational dispatch center: five ambulance hospitals, two fire stations, and two rescue bases. Physical resource onek; same type-er unique vehicle IDs relevant center-gular moddhe round-robin stationed.
+
+**Q: Earthquake ar pit rescue add korar por resource mapping ki?**
+A: Earthquake-er base requirement one rescue team; severity 4/5 hole ambulance-o add hoy. Pit rescue-te base thekei one rescue team plus one ambulance lage, karon extraction and medical transport duita-i expected. Egula independent variables hoy, tai same incident complete response pete duita distinct compatible resource allocation dorkar.
 
 **Q: Route kon algorithm diye ber koro?**
 A: Lab 1-er A* routing layer reuse kori. Lab 2 candidate geometry distance-only shortest traversable directed road route. A* internally admissible ALT landmark lower bound use kore. Closed road traverse korte pare na.
@@ -1349,10 +1386,16 @@ A: Current Lab 2 candidate route shortest traversable distance diye select hoy. 
 A: Base speed 25 km/h. Prottek edge-e `distance / base_speed * (1 + 1.5*traffic + 0.5*condition)`, tarpor shob edge time sum kori. Eta educational estimate, real ETA na.
 
 **Q: Cost kivabe calculate koro?**
-A: `estimated_cost = resource.dispatch_cost + 45 * distance_km`. Ambulance/fire/rescue-er base dispatch cost respectively 900/1450/1150, tar sathe seeded 0.90-to-1.15 multiplier. Candidate incident budget cross korle domain theke remove.
+A: `estimated_cost = resource.dispatch_cost + 45 * billable_distance_km`. Fire/rescue-er billable distance center-to-incident. Ambulance-er jonno center-to-incident plus incident-to-reserved-hospital distance. Ambulance/fire/rescue-er base dispatch cost respectively 900/1450/1150, tar sathe seeded 0.90-to-1.15 multiplier. Candidate incident budget cross korle domain theke remove.
 
 **Q: Solver ki minimum cost solution guarantee kore?**
-A: Na. Eta satisfaction CSP: complete consistent allocation khuje. Cost budget-er hard filter and comparison/reporting metric. Global minimum total cost chaile branch-and-bound ba weighted CSP/constraint optimization add korte hobe.
+A: Normal Backtracking, CBJ, ar Min-Conflicts global minimum cost guarantee kore na; tara satisfaction solve kore. Kintu Backtracking select kore **Prove minimum dispatch cost** enable korle branch-and-bound shob potentially cheaper branch examine/prune kore and minimum total cost-er optimality prove kore.
+
+**Q: Branch-and-bound behind the scenes kivabe optimality prove kore?**
+A: First complete assignment-er cost `best_cost` incumbent hoy. Unfinished branch-e current cost-er sathe prottek unassigned variable-er cheapest still-unused candidate cost jog kore optimistic lower bound banai. Ei bound jodi `best_cost`-er cheye kom na hoy, branch-ta konobhabei better hote parbe na, tai prune kori. Better complete assignment pele incumbent replace hoy. Entire relevant tree finish hole kono cheaper solution baki nai—tokhon optimality proven.
+
+**Q: Minimum-cost mode Compare All-e nei keno?**
+A: Compare All-er purpose same objective-e lecture-er Backtracking, CBJ, Min-Conflicts compare kora. Minimum-cost mode first-solution satisfaction-er por-o search continue kore; objective and runtime meaning duita change hoy. Tai eta separate optional Backtracking experiment, jate unfair comparison na hoy.
 
 **Q: LCV keno cheapest resource first ney na?**
 A: LCV-r purpose neighbor-der maximum flexibility preserve kora. Tai first key holo value-ta koyta remaining neighbor domain-e ache; impact tie hole shorter response time, tarpor stable resource ID. Cheapest-global solution LCV-r claim na.
@@ -1373,7 +1416,10 @@ A: Na. Arc consistency local property. Every value-er local support thakleo glob
 A: Pairwise domain-e prottek value-er different support thakte pare, but group collectively enough distinct resource pabe na—eta Hall/pigeonhole problem. Tai deterministic maximum-cardinality bipartite matching pass add kora ache.
 
 **Q: MRV/MCV ki?**
-A: Remaining legal value shobcheye kom jar, take age select kori—fail first. Lecture-e eta MCV/Most Constrained Variable-o bola hoy. Impossible branch hole early detect hoy.
+A: Remaining legal value shobcheye kom jar, take age select kori—fail first. Lecture-e eta MCV/Most Constrained Variable-o bola hoy. Impossible branch hole early detect hoy. Backend prottek decision-e recursion depth, selected variable, legal count, dynamic degree, severity, and next three alternatives record kore; UI-te actual selection trace dekha jay.
+
+**Q: MRV trace browser ki result dekhe banay?**
+A: Na. `select_unassigned_variable()` ranking korar exact moment-e evidence backend `selection_trace`-e append kore. Browser sudhu returned trace render kore. Tai selected variable “keno” choose holo—MRV count, Degree tie-break, Severity tie-break—actual search state diye verify kora jay.
 
 **Q: Degree heuristic kobe use hoy?**
 A: MRV tie hole. Still-unassigned neighbor beshi jar, take select kori, karon se remaining problem-ke beshi constrain kore. MRV-r age Degree use kori na.
@@ -1424,7 +1470,16 @@ A: Universal best na. Complete solution first priority. Tarpor allocation rate/c
 A: `runtime_ms` only solver search/repair loop. Scenario generation, candidate A* route preparation, AC-3 preprocessing, network request, map rendering, and deliberate playback animation same metric-er part na. Animation time algorithm computation time bole present kori na.
 
 **Q: Sir jodi jiggesh kore “tumi ki optimize korcho?”**
-A: Primary objective complete consistent satisfaction. MRV/Degree/LCV search effort komanor heuristic, response time value tie-break, budget hard constraint. Dashboard cost/response compare kore, but global minimum-cost assignment guarantee claim kori na.
+A: Default primary objective complete consistent satisfaction. MRV/Degree/LCV search effort komanor heuristic, response time value tie-break, budget hard constraint. Optional branch-and-bound mode-e objective explicitly minimum total dispatch cost and optimality proven; default three-solver comparison-e ei claim kori na.
+
+**Q: Hospital bed allocation kivabe conflict-free rakho?**
+A: Vehicle CSP-r age deterministic facility preprocessing hoy. Ambulance requirements higher severity, tighter deadline, stable ID order-e process hoy. Compatible reachable facility-gular remaining bed check kore fastest facility reserve kori and count immediately decrement kori. Tai ek bed duibar reserve hoy na. Fire ambulance only burn-capable facility ney; onno ambulance emergency facility ney.
+
+**Q: Hospital route ar ambulance response route ki same?**
+A: Na. First leg holo dispatch center theke incident—eta colored solid allocation route. Second leg holo incident theke reserved receiving facility—eta red dashed route. Response deadline first emergency-arrival leg-e check hoy; ambulance cost-e duita road distance include hoy.
+
+**Q: Available bed na thakle ki hoy?**
+A: Oi ambulance requirement-er compatible receiving plan create hoy na. Domain builder prottek ambulance candidate-ke `no compatible receiving-hospital bed available` reason-e remove kore. Domain empty hole full CSP unsatisfied/partial status pay; independent feasible requirements playback-e thakte pare.
 
 **Q: Ei system real emergency dispatch-e use kora jabe?**
 A: Na. Eta educational simulation. Incident, availability, traffic, capacity, deadline, and cost simulated; real safety-critical dispatch-er validation, live feeds, governance, and reliability requirement fulfill kore na.
@@ -1436,10 +1491,12 @@ A: Na. Eta educational simulation. Incident, availability, traffic, capacity, de
 - One resource can serve at most one simultaneous requirement.
 - Shift duration and later resource reuse are outside the model.
 - Budgets are per requirement, not a shared incident budget.
+- Receiving-facility beds are reserved by a deterministic severity/deadline preprocessing policy. Vehicle assignment is solved as the CSP; hospital selection is not yet a joint vehicle-and-bed CSP variable.
 - `Alldiff` is decomposed into binary inequality; there is no global GAC propagator.
 - AC-3 is preprocessing; full MAC, path consistency, and general `k`-consistency are not implemented.
 - Min-Conflicts may finish with residual conflicts and cannot prove unsatisfiability.
 - Exact solvers can become expensive as domains and overlap grow.
+- Minimum-cost branch-and-bound is exact but can take much longer than first-solution Backtracking; it is therefore an explicit optional experiment and is not mixed into the default three-solver comparison.
 - The browser carries frozen scenario state to survive independent serverless instances.
 - This educational system must not be used for real safety-critical dispatch.
 

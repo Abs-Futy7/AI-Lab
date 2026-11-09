@@ -9,6 +9,8 @@ class IncidentType(str, Enum):
     fire = "FIRE"
     road_accident = "ROAD_ACCIDENT"
     flood_rescue = "FLOOD_RESCUE"
+    earthquake = "EARTHQUAKE"
+    pit_rescue = "PIT_RESCUE"
 
 
 class ResourceType(str, Enum):
@@ -48,6 +50,11 @@ class CSPAlgorithm(str, Enum):
     local_search = "local_search"
 
 
+class FacilityCapability(str, Enum):
+    emergency = "EMERGENCY"
+    burn_unit = "BURN_UNIT"
+
+
 class ResourceCenter(BaseModel):
     id: str
     name: str
@@ -66,6 +73,16 @@ class Resource(BaseModel):
     capacity: int = Field(ge=1)
     dispatch_cost: float = Field(ge=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReceivingFacility(BaseModel):
+    id: str
+    name: str
+    latitude: float
+    longitude: float
+    capabilities: list[FacilityCapability]
+    total_beds: int = Field(ge=1)
+    available_beds: int = Field(ge=0)
 
 
 class Incident(BaseModel):
@@ -104,6 +121,7 @@ class Lab2Scenario(BaseModel):
     incidents: list[Incident]
     resources: list[Resource]
     centers: list[ResourceCenter]
+    facilities: list[ReceivingFacility] = Field(default_factory=list)
     assumptions: list[str]
 
 
@@ -113,6 +131,7 @@ class SolveRequest(BaseModel):
     algorithm: CSPAlgorithm = CSPAlgorithm.backtracking
     debug: bool = True
     local_search_max_steps: int = Field(default=3000, ge=10, le=20000)
+    optimize_cost: bool = False
 
 
 class CompareLab2Request(BaseModel):
