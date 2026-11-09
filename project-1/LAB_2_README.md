@@ -7,25 +7,26 @@ Lab 2 implements the material in **CSE 4101 Lecture Slide 5: Constraint Satisfac
 ## Contents
 
 1. [Problem and slide alignment](#problem-and-slide-alignment)
-2. [What happens when the project runs](#what-happens-when-the-project-runs)
-3. [Scenario, incidents, routes, response time, and cost](#scenario-incidents-routes-response-time-and-cost)
-4. [CSP definitions and consistency methods](#csp-definitions-from-the-lecture)
-5. [Formal CSP formulation](#formal-csp-formulation)
-6. [Variables and domains in code](#variables-and-domains-in-code)
-7. [Constraints and constraint graph](#constraints-and-constraint-graph)
-8. [AC-3 constraint propagation](#ac-3-constraint-propagation)
-9. [MRV, Degree, LCV, and the meaning of heuristic](#mrv-degree-and-lcv)
-10. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
-11. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
-12. [Min-Conflicts local search](#min-conflicts-local-search)
-13. [Which solver is better and when](#which-solver-is-better-and-when)
-14. [Function-by-function implementation map](#function-by-function-implementation-map)
-15. [Line-by-line code walkthrough](#line-by-line-implementation-walkthrough)
-16. [Worked emergency example](#worked-miniature-emergency-example)
-17. [Exact project pipeline](#exact-project-pipeline)
-18. [Metrics and source layout](#metrics-and-source-layout)
-19. [API, tests, solver comparison, and viva](#api-tests-and-viva)
-20. [Assumptions and limitations](#assumptions-and-limitations)
+2. [Teacher-conversation requirement audit](#teacher-conversation-requirement-audit)
+3. [What happens when the project runs](#what-happens-when-the-project-runs)
+4. [Scenario, incidents, routes, response time, and cost](#scenario-incidents-routes-response-time-and-cost)
+5. [CSP definitions and consistency methods](#csp-definitions-from-the-lecture)
+6. [Formal CSP formulation](#formal-csp-formulation)
+7. [Variables and domains in code](#variables-and-domains-in-code)
+8. [Constraints and constraint graph](#constraints-and-constraint-graph)
+9. [AC-3 constraint propagation](#ac-3-constraint-propagation)
+10. [MRV, Degree, LCV, and the meaning of heuristic](#mrv-degree-and-lcv)
+11. [Backtracking with Forward Checking](#backtracking-with-forward-checking)
+12. [Conflict-Directed Backjumping](#conflict-directed-backjumping)
+13. [Min-Conflicts local search](#min-conflicts-local-search)
+14. [Which solver is better and when](#which-solver-is-better-and-when)
+15. [Function-by-function implementation map](#function-by-function-implementation-map)
+16. [Line-by-line code walkthrough](#line-by-line-implementation-walkthrough)
+17. [Worked emergency example](#worked-miniature-emergency-example)
+18. [Exact project pipeline](#exact-project-pipeline)
+19. [Metrics and source layout](#metrics-and-source-layout)
+20. [API, tests, solver comparison, and viva](#api-tests-and-viva)
+21. [Assumptions and limitations](#assumptions-and-limitations)
 
 ## Problem and slide alignment
 
@@ -51,6 +52,84 @@ Lab 2 reuses Lab 1's road layer only to determine candidate reachability, route 
 | Min-Conflicts | Seeded repair of a complete inconsistent assignment |
 
 The slide also discusses node, path, and general `k`-consistency. This project performs unary filtering and arc consistency. It does not claim a general path-consistency or `k`-consistency engine.
+
+## Teacher-conversation requirement audit
+
+এই audit-টি Lab 2 assignment নিয়ে শিক্ষকের recorded discussion-এর সঙ্গে বর্তমান implementation মিলিয়ে তৈরি করা। আলোচনায় ব্যবহৃত example এবং বাধ্যতামূলক expectation আলাদা করে দেখা হয়েছে। যেমন পাঁচটি ambulance point ছিল একটি suggested initialization; শিক্ষক একইসঙ্গে বলেছেন initialization নিয়ে তিনি বেশি worried নন এবং design-এ flexibility আছে। তাই example-কে hard requirement হিসেবে দেখানো হয়নি।
+
+### শিক্ষক মূলত কী দেখতে চেয়েছেন
+
+শিক্ষকের মূল target ছিল একটি **interactive emergency control-center resource-allocation system**:
+
+1. Dhaka/একটি city map-এ একই সময়ে আসা multiple emergency request দেখাতে হবে।
+2. Medical, fire, road accident, এবং flood/water-rescue—এই চারটি category অবশ্যই থাকতে হবে।
+3. Ambulance, fire unit, এবং rescue team fixed location/center-এ থাকবে; প্রতিটি type-এর একাধিক physical unit থাকবে।
+4. একটি incident-এর জন্য একাধিক resource একসঙ্গে লাগতে পারে। যেমন severe fire-এ fire unit-এর সঙ্গে ambulance লাগতে পারে।
+5. কোন incident-এ কোন physical resource যাবে—এটাই CSP allocation problem; শুধু source-to-destination route search নয়।
+6. Road accessibility/blocked road, travel time/deadline, distance, resource availability, capacity/capability, cost/budget, severity/priority বিবেচনা করতে হবে।
+7. Small, medium, large workload এবং সেই অনুযায়ী resource-count variation দেখাতে হবে।
+8. প্রথমে CSP formulation এবং consistency/arc-consistency preprocessing করতে হবে।
+9. Backtracking-এ variable ordering ও value ordering heuristic প্রয়োগ এবং ব্যাখ্যা করতে হবে।
+10. একই scenario-তে Backtracking, Backjumping, এবং Local Search চালাতে হবে।
+11. Backjumping-এ relevant conflict set ব্যবহার করে irrelevant decision skip করার ধারণা থাকতে হবে।
+12. Map-এ কোন center/resource কোন incident-এ allocated হয়েছে তা route-সহ দেখাতে হবে।
+13. তিন solver-এর allocation, steps/work, conflicts, এবং outcome comparison দেখাতে হবে।
+14. আগের Lab 1 map/road work-কে replace না করে একই scenario-এর বড় project হিসেবে extend করতে হবে।
+
+### Requirement-by-requirement বর্তমান অবস্থা
+
+| শিক্ষকের expectation | Status | বর্তমান project-এ evidence |
+|---|---|---|
+| Interactive control center and map | ✅ Complete | `/lab2` dashboard, Leaflet map, scenario controls, solve/replay/step controls |
+| Four required emergency categories | ✅ Complete | `MEDICAL`, `FIRE`, `ROAD_ACCIDENT`, `FLOOD_RESCUE` |
+| Multiple simultaneous requests | ✅ Complete | 30/100/300 presets plus custom 1–300 incident count |
+| Multiple physical resource types and counts | ✅ Complete | Ambulance, fire unit, rescue team; scale/availability-based fleets with unique IDs |
+| Fixed resource starting points | ✅ Complete | Six fixed Dhaka teaching centers: two per resource type |
+| One incident may require multiple units/types | ✅ Complete | Severity 4–5 fire adds ambulance; accident adds rescue; flood rescue adds ambulance |
+| CSP `(X,D,C)` formulation | ✅ Complete | Requirement-slot variables, feasible physical-resource domains, unary filters, pairwise `Alldiff` |
+| Road availability and blocked roads | ✅ Complete | Shared Lab 1 graph with normal, some-blocked, and heavy-disruption scenarios |
+| Time/deadline constraint | ✅ Complete | Traffic/condition-adjusted route time checked against strict/normal/relaxed deadline |
+| Distance consideration | ✅ Complete | A* road distance is stored and shown for each allocation |
+| Resource availability | ✅ Complete | High/normal/shortage fleet policies and per-resource availability filtering |
+| Capacity/capability | ✅ Complete | Resource capacity must satisfy severity-derived required capacity |
+| Cost/budget boundary | ✅ Complete | `dispatch_cost + 45 × distance_km`; over-budget candidate removed |
+| Severity/prioritization | ✅ Complete within stated design freedom | Severity tightens deadline, raises capacity, adds resources, and breaks MRV/Degree ties |
+| AC-3 before search | ✅ Complete | Shared queue-based AC-3 runs before Backtracking, CBJ, and Min-Conflicts |
+| Variable/value ordering | ✅ Implemented | MRV/MCV → dynamic Degree → severity → stable ID; LCV → travel time → resource ID |
+| Backtracking | ✅ Complete | Recursive exact solver with Forward Checking and reversible domain restoration |
+| Conflict-Directed Backjumping | ✅ Complete | Explicit conflict sets, skipped variables, jump target, count, distance, and UI trace |
+| Local Search | ✅ Complete | Seeded Min-Conflicts with repair steps and conflict-history graph |
+| Same-scenario comparison | ✅ Complete | One frozen base problem is cloned for all three solvers |
+| Comparison calculations and visuals | ✅ More than required | Three maps, allocations, effort, backtracks/jumps/repairs, conflicts, runtime, response, cost, heatmap, plots, and difference map |
+| Show allocation on the map | ✅ Complete | Center/resource → incident road routes, playback, allocation table, and per-step evidence |
+| Extend rather than remove Lab 1 | ✅ Complete | Lab 1 remains separate; Lab 2 reuses its Dhaka road graph, disruptions, and A* route evidence |
+
+### যা আংশিক বা optional improvement
+
+Core assignment-এর কোনো required algorithm missing নেই। তবে examiner-facing clarity আরও বাড়াতে নিচের improvement করা যেতে পারে:
+
+1. **Exact MRV selection sequence:** backend এখন `mrv_selections` count রাখে এবং UI pipeline/count দেখায়, কিন্তু প্রতিটি recursive step-এ কোন variable কেন select হলো—তার chronological trace সংরক্ষণ করে না। LCV order per variable দেখা যায়। শিক্ষক যদি “প্রতিটি ordering step live দেখাও” বোঝান, তাহলে MRV/Degree decision trace একটি useful addition হবে।
+2. **আরও ambulance locations:** শিক্ষক পাঁচটি ambulance point উদাহরণ দিয়েছিলেন; project-এ দুইটি ambulance hospital, দুইটি fire station, এবং দুইটি rescue base আছে। তিনি initialization flexible এবং secondary বলেছেন, তাই এটি correctness gap নয়। Demo geography সমৃদ্ধ করতে চাইলে আরও তিনটি ambulance center যোগ করা যায়।
+3. **Hospital/burn-unit availability:** vehicle/resource availability আছে, কিন্তু hospital bed বা burn-unit capacity আলাদা entity হিসেবে model করা হয়নি। শিক্ষক এটিকে possible constraint-এর example হিসেবে বলেছেন, required core list হিসেবে নয়।
+4. **Aggregate incident budget:** বর্তমান budget প্রতিটি requirement candidate-এর feasibility check করে; multi-resource incident-এর combined shared budget optimize করে না। শিক্ষক optimal solution চাননি—CSP satisfaction চেয়েছেন—তাই এটি documented design choice।
+5. **Separate earthquake/pit-rescue labels:** earthquake বা শিশুকে গর্ত থেকে rescue ছিল motivating example। Required চার category project-এ exact আছে; ওই extra examples বর্তমানে `FLOOD_RESCUE`/rescue-team behavior দিয়ে abstract করা হয়।
+
+### Bottom-line verdict
+
+বর্তমান Lab 2 project শিক্ষকের **সব core requirement পূরণ করে**: city-map control center, four incident classes, multiple fixed resources, multiple-resource incidents, real road feasibility, time/cost/capacity/availability constraints, AC-3, MRV/Degree/LCV, Backtracking, conflict-directed Backjumping, Min-Conflicts, interactive allocation, এবং same-scenario comparison।
+
+এখন সবচেয়ে মূল্যবান next addition নতুন solver নয়; বরং actual **MRV/Degree selection trace** দৃশ্যমান করা। এটি implementation correctness বদলাবে না, কিন্তু “heuristic কীভাবে apply হচ্ছে” examiner-এর সামনে আরও সরাসরি প্রমাণ করবে।
+
+### Evaluation-এর সময় কীভাবে দেখাবেন
+
+1. Small বা custom scenario generate করে Incidents এবং CSP variables আলাদা কেন দেখান।
+2. Road scenario `Some roads blocked`, resource availability `Shortage`, এবং strict deadline বেছে constraints visible করুন।
+3. Backtracking solve করে Domain Inspector-এ removed reason, AC-3 remaining domain, এবং LCV order দেখান।
+4. Step visualizer দিয়ে center → selected resource → route → incident → deadline-valid allocation দেখান।
+5. CBJ run-এ conflict set, skipped variables, and jump target দেখান; easy run-এ jump না হলে harder/shortage scenario ব্যবহার করুন।
+6. Min-Conflicts run-এ initial/final conflicts, repair steps, এবং conflict-history graph দেখান।
+7. Compare All খুলে identical scenario-র তিনটি map, allocation/effort table, recommendation, এবং bottom route-difference map দেখান।
+8. শেষে বলুন: এটি minimum-cost optimizer নয়; complete consistent allocation primary goal, আর cost/response comparison evidence।
 
 ## What happens when the project runs
 
