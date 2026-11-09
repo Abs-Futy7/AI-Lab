@@ -188,6 +188,143 @@ Ei section-ta viva/demo-r somoy screen-er sathe mile directly bola jay. Eta mukh
 
 > Dhori `X1`-er 2ta legal ambulance, `X2`-er 5ta, `X3`-er 3ta ache. MRV `X1` select korbe. Karon `X1` fail korar possibility beshi; impossible hole search early janbe, pore boro subtree waste korbe na.
 
+#### Ei specific 100-incident MRV trace-ta kivabe explain korben
+
+Pasted run-er important summary holo:
+
+```text
+Incidents                = 100
+Original CSP variables   = 132
+Largest matchable subset = 98
+Allocated routes         = 98
+MRV selections           = 98
+Nodes visited            = 99
+Backtracks               = 0
+```
+
+**Prothome full context-ta sir-ke bolben:**
+
+> Sir, ekhane 100ta incident theke 132ta resource-requirement variable hoyeche, karon kichu incident multiple resource chai. Kintu availability, resource type, capacity, route, deadline, budget, hospital bed, and unique-resource constraint apply korar por full 132-variable allocation possible chilo na. Preprocessing largest matchable 98-variable subset ber koreche. Backtracking oi shared feasible subset-er 98ta requirement assign kore map-e 98ta route show korche. Tai status `Partial / unsatisfied`, kintu displayed 98ta allocation nijeder moddhe consistent ebong final violations zero.
+
+Eta bujha important: `98/132 allocated` mane solver 34ta valid assignment hariye feleche emon na. Full problem-er shob requirement-er jonno enough **distinct feasible** resource combination chilo na; tai largest playable feasible subset solve hoyeche.
+
+##### Prottek trace card-er field-er meaning
+
+| UI field | Exact meaning | Ei run-e ki bujhacche |
+|---|---|---|
+| `Step 8` | `select_unassigned_variable()`-er eighth recorded call | Solver ekhon eighth variable select korche |
+| `depth 7` | Current partial assignment-e already 7ta variable assigned | Eighth variable assign korar age recursion level 7 |
+| `INC-072_RESCUE_TEAM_1` | Incident 72-er first rescue-team requirement variable | Eta incident marker na; eta ekta CSP resource slot |
+| `Legal values = 11` | Current state-e unused and still-feasible 11ta resource ID ache | Initial domain na; previous assignments/Forward Checking-er por current count |
+| `Dynamic degree = 18` | Selected variable-er 18ta connected neighbor ekhono unassigned | Road-node degree na; CSP constraint-graph degree |
+| `Severity = 5` | Parent incident-er severity | MRV and Degree tie hole third tie-break |
+| `Next candidates` | Same moment-e ranking-e porer three unassigned variables | Egula resource value, predicted route, ba future guaranteed choice na |
+
+##### Keno legal values `12 → 11 → 10 → ...` hocche
+
+Ei rescue-team variable-gular domain onekta overlap kore. Physical rescue team ekbar assign hole same resource onno simultaneous requirement-e use kora jabe na. Backtracking ekta variable-e resource assign korar por Forward Checking oi resource ID connected unassigned neighbor-gular domain theke temporarily remove kore.
+
+Tai pattern-ta hocche:
+
+```text
+ager step: 12 unused legal rescue teams
+ekta rescue team assign holo
+next step: 11 unused legal rescue teams
+arekta assign holo
+next step: 10 unused legal rescue teams
+```
+
+**Sir-ke bolben:**
+
+> Sir, legal-value countdown-ta MRV nije resource delete korche bole na. Assignment-er por uniqueness constraint and Forward Checking already-used physical rescue team-ta remaining overlapping domain theke remove korche. Tarpor next recursive call-e MRV updated current domain count measure korche.
+
+##### Keno dynamic degree `19 → 18 → 17 → ...` hocche
+
+Dynamic Degree sudhu **still-unassigned connected neighbors** count kore. Ekta variable select and assign hoye gele se ar unassigned set-e thake na. Rescue requirements-gula overlapping resource share koray tara constraint graph-e eke onno-r neighbor. Prottek assignment-er por remaining variable-gular unassigned-neighbor count normally ek kore kome.
+
+```text
+Step 7: selected variable-er 19 unassigned neighbors
+Step 8: ager variable assigned, tai 18 unassigned neighbors
+Step 9: aro ekta assigned, tai 17 unassigned neighbors
+```
+
+**Sir-ke bolben:**
+
+> Sir, eta Dhaka road graph-er degree na. Eta CSP constraint graph-er dynamic degree. `Dynamic` bolar karon assignment barar sathe unassigned neighbor count recalculate hoy.
+
+##### Severity exactly kothay decision change kore
+
+Ordering key holo:
+
+```text
+1. smallest legal-value count     = MRV
+2. largest dynamic degree         = Degree tie-break
+3. highest incident severity      = domain tie-break
+4. lexicographically stable ID    = deterministic final tie-break
+```
+
+Step 12-e `INC-096_RESCUE_TEAM_1`-er legal values 7, kintu next severity-4 candidates-er 12 values. Ekhane severity 5 bole variable select hoyni; **7 < 12 bole MRV primary rule-e select hoyeche**. Severity kokhono worse MRV result-ke override kore na.
+
+Step 13-e remaining top candidates-er legal values, degree, and severity same hole `INC-002...`, tarpor `INC-009...`, tarpor `INC-011...` stable ID order-e rank hoy. Stable ID random tie bhange na, tai same scenario and seed-e explanation reproducible thake.
+
+**Sir-ke bolben:**
+
+> Sir, severity amar main heuristic na. Ami lecture order preserve korechi: MRV first, Degree second. Severity only third tie-break, and stable ID final deterministic tie-break.
+
+##### Step 8 card-ta line by line evabe bolben
+
+> Sir, Step 8-e recursion depth 7, mane 7ta requirement already assigned. Ekhon unassigned shob variable-er current legal count calculate kore solver `INC-072_RESCUE_TEAM_1` select koreche. Er 11ta unused feasible rescue team ache. Same MRV tie-r moddhe er dynamic degree 18, mane 18ta still-unassigned overlapping variable-ke eta constrain kore. Severity 5 holo third tie-break. `INC-083`, `INC-087`, and `INC-090` holo oi exact moment-er next-ranked variables—not resource choices. Variable select howar por resource value choose korar kaj alada LCV korbe.
+
+##### Ekhane LCV kothay
+
+Trace card variable-selection explain kore; card-er `Next candidates` **LCV list na**. Selected variable-er 11 legal resource ID-ke `order_domain_values()` alada kore rank kore:
+
+1. je resource use korle remaining neighbors-er kom choice noshto hoy;
+2. tie hole shorter response time;
+3. abar tie hole stable resource ID.
+
+Tai complete decision-ta duita stage:
+
+```text
+MRV → Degree → Severity → stable variable ID
+    chooses WHICH requirement variable
+
+LCV → response time → stable resource ID
+    chooses WHICH physical resource to try first
+```
+
+##### `Showing the first 18 of 98` mane ki
+
+Backend ei run-e 98ta variable-selection decision record koreche. UI readability-r jonno sudhu first 18ta card render kore; solver 18 step-e stop koreni. Result-e:
+
+- 98 MRV selections = 98 selected subset variables;
+- 99 nodes visited = initial/root search state plus 98 successful recursive assignment states;
+- 0 backtracks = first LCV-guided branch-ei prottek step feasible chilo;
+- depth monotonically `0, 1, 2, ...` bereche = shown prefix-e kono failed branch theke fire ashte hoyni.
+
+Jodi backtracking lagto, trace-e pore same ba lower depth abar dekhte parten, karon failed value restore kore solver alternative branch-e dhukto. Ekhane `0 backtracks` tai straight success path-er evidence.
+
+##### Ei trace ki prove kore, ar ki prove kore na
+
+**Prove kore:**
+
+- variable ordering actual backend search state theke record hoyeche;
+- MRV primary, Degree second, Severity third, stable ID fourth;
+- Forward Checking-er por legal values dynamically change hocche;
+- chosen 98-variable subset first branch-e conflict-free assignment peyechilo.
+
+**Prove kore na:**
+
+- Backtracking full original 132-variable problem solve koreche;
+- selected allocation globally minimum-cost;
+- severity MRV-ke override kore;
+- `Next candidates` holo next route ba resource;
+- zero backtrack mane Backtracking shob scenario-te always best.
+
+##### 30-second ready answer
+
+> Sir, eta reconstructed frontend list na; backend recursive solver-er actual chronological trace. Step 8 depth 7 mane 7ta variable already assigned. `INC-072_RESCUE_TEAM_1`-er current unused legal resource 11ta, unassigned constraint neighbor 18ta, severity 5. Solver first minimum legal count diye MRV, tie hole maximum dynamic degree, tie hole severity, tarpor stable ID use kore variable-ta select kore. Ager rescue resource assign howar por Forward Checking same physical resource remaining overlapping domain theke remove korche, tai values 12 theke 11, 10 evabe komche. Assigned variable unassigned graph theke ber hoye jacche bole dynamic degree-o 19 theke 18, 17 hocche. Tarpor selected variable-er physical resource choose korte alada LCV use hoy. Full problem-e 132 requirement chilo, largest matchable subset 98; tai 98 MRV selections and 98 routes. Nodes 99 and backtracks zero mane ei subset first ordered branch-ei solve hoyeche.
+
 ### 6. Degree tie-break kothay use hoyeche
 
 **Screen-e dekhabo:** Same legal-value count-er selection trace, dynamic-degree value.
