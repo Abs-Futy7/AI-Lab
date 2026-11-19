@@ -1,6 +1,6 @@
 # AI Lab Frontend
 
-Project documentation: [combined README](../README.md) · [Lab 1 README](../LAB_1_README.md) · [Lab 2 CSP README](../LAB_2_README.md)
+Project documentation: [combined README](../README.md) · [Lab 1 README](../LAB_1_README.md) · [Lab 2 CSP README](../LAB_2_README.md) · [Lab 3 adversarial-search README](../LAB_3_README.md)
 
 The Next.js frontend contains two separate university AI laboratory demonstrations built with React, TypeScript, Raleway, Leaflet, and Recharts.
 
@@ -8,6 +8,7 @@ The Next.js frontend contains two separate university AI laboratory demonstratio
 
 - [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1)
 - [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2)
+- [Lab 3 — Adversarial Emergency Route Defense](https://ai-lab-project-1.vercel.app/lab3)
 - [Lab 1 — Synchronized six-algorithm simulation](https://ai-lab-project-1.vercel.app/simulation)
 - [Project directory landing page](https://ai-lab-project-1.vercel.app)
 
@@ -15,7 +16,11 @@ The Next.js frontend contains two separate university AI laboratory demonstratio
 
 ### Project directory: `/`
 
-The application opens on a responsive project-selection page. Project 01 opens Lab 1 and Project 02 opens Lab 2; each lab includes a Projects link back to this directory.
+The application opens on a responsive project-selection page. Project 01 opens Lab 1, Project 02 opens Lab 2, and Project 03 opens the Lab 2-linked adversarial search workspace; each lab includes a Projects link back to this directory.
+
+### Lab 3: `/lab3`
+
+Lab 3 requires a solved Lab 2 allocation. **Continue selected mission to Lab 3** stores the exact scenario/allocation in tab-scoped session storage. The page restores the same graph, shows the frozen Lab 2 route, and runs Minimax, Alpha-Beta, or MCTS against a traffic/waterlogging/block/false-report disruption agent. Its comparison view renders three route maps before detailed pruning, runtime, utility, rollout, and graph-scale evidence.
 
 ### Lab 1: `/lab1`
 

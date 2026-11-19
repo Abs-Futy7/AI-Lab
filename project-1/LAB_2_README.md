@@ -1810,3 +1810,11 @@ A: Na. Eta educational simulation. Incident, availability, traffic, capacity, de
 ## One-sentence defense
 
 Lab 2 is a finite discrete emergency-allocation CSP that manually combines unary filtering, a sparse binary `Alldiff` graph, AC-3 preprocessing, the Lecture 5 MRV/MCV → Degree → LCV ordering, Forward-Checking Backtracking, Conflict-Directed Backjumping, and seeded Min-Conflicts, while reusing Lab 1 only for road-based feasibility evidence.
+
+## Lab 2 to Lab 3 handoff
+
+After solving Lab 2, **Continue selected mission to Lab 3** freezes the current playback allocation instead of generating a different experiment. The saved snapshot contains the complete scenario, road mode, deterministic seed, one selected resource-to-incident allocation, its Lab 2 route, and the selected playback step. Lab 3 validates the IDs, rebuilds the same road graph, exposes a stable fingerprint, and uses the allocation only as the initial adversarial mission.
+
+Lab 2 still owns the CSP question: **which resource is assigned to which requirement?** Lab 3 does not solve or alter that assignment. Lab 3 owns the game question: **given that fixed dispatch, which road move should the coordinator choose when an opponent may disrupt the road?**
+
+Full details: [Lab 3 adversarial search README](LAB_3_README.md) and [live Lab 3](https://ai-lab-project-1.vercel.app/lab3).

@@ -2,6 +2,7 @@ import axios from "axios";
 
 import type { CompareResponse, ComparisonRequest, RouteRequest, SearchResult } from "@/types/routing";
 import type { CSPAlgorithm, Lab2Comparison, Lab2GenerateRequest, Lab2Result, Lab2Scenario } from "@/types/lab2";
+import type { Lab3Algorithm, Lab3Benchmarks, Lab3CompareResponse, Lab3Config, Lab3LaunchSnapshot, Lab3Prepared, Lab3RunResponse } from "@/types/lab3";
 
 const client = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "",
@@ -43,6 +44,35 @@ export async function compareLab2Scenario(scenario: Lab2Scenario): Promise<Lab2C
     scenario_id: scenario.scenario_id,
     scenario: { ...scenario, id: scenario.scenario_id },
     debug: true, local_search_max_steps: 3000,
+  });
+  return data;
+}
+
+function lab3Snapshot(snapshot: Lab3LaunchSnapshot) {
+  return {
+    ...snapshot,
+    scenario: { ...snapshot.scenario, id: snapshot.scenario.scenario_id },
+  };
+}
+
+export async function prepareLab3(snapshot: Lab3LaunchSnapshot): Promise<Lab3Prepared> {
+  const { data } = await client.post<Lab3Prepared>("/api/lab3/prepare", { snapshot: lab3Snapshot(snapshot) });
+  return data;
+}
+
+export async function runLab3(snapshot: Lab3LaunchSnapshot, algorithm: Lab3Algorithm, config: Lab3Config): Promise<Lab3RunResponse> {
+  const { data } = await client.post<Lab3RunResponse>("/api/lab3/run", { snapshot: lab3Snapshot(snapshot), algorithm, config });
+  return data;
+}
+
+export async function compareLab3(snapshot: Lab3LaunchSnapshot, config: Lab3Config): Promise<Lab3CompareResponse> {
+  const { data } = await client.post<Lab3CompareResponse>("/api/lab3/compare", { snapshot: lab3Snapshot(snapshot), config });
+  return data;
+}
+
+export async function benchmarkLab3(snapshot: Lab3LaunchSnapshot, config: Lab3Config): Promise<Lab3Benchmarks> {
+  const { data } = await client.post<Lab3Benchmarks>("/api/lab3/benchmarks", {
+    snapshot: lab3Snapshot(snapshot), config, rollout_budgets: [50, 100, 200], network_sizes: [200, 500, 1000, 3000],
   });
   return data;
 }

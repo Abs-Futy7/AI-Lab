@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -10,6 +10,11 @@ from app.services.lab2_service import compare as compare_lab2
 from app.services.lab2_service import config as lab2_config
 from app.services.lab2_service import create_scenario, list_resources, solve as solve_lab2
 from app.services.routing_service import calculate_route
+from app.adversarial.models import Lab3BenchmarkRequest, Lab3CompareRequest, Lab3PrepareRequest, Lab3RunRequest
+from app.services.lab3_service import benchmarks as benchmark_lab3
+from app.services.lab3_service import compare as compare_lab3
+from app.services.lab3_service import prepare as prepare_lab3
+from app.services.lab3_service import run as run_lab3
 
 app = FastAPI(
     title="Emergency Vehicle Routing API",
@@ -69,3 +74,35 @@ def solve_lab2_scenario(request: SolveRequest):
 @app.post("/api/lab2/compare")
 def compare_lab2_scenario(request: CompareLab2Request):
     return compare_lab2(request)
+
+
+@app.post("/api/lab3/prepare")
+def prepare_lab3_scenario(request: Lab3PrepareRequest):
+    try:
+        return prepare_lab3(request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/lab3/run")
+def run_lab3_algorithm(request: Lab3RunRequest):
+    try:
+        return run_lab3(request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/lab3/compare")
+def compare_lab3_algorithms(request: Lab3CompareRequest):
+    try:
+        return compare_lab3(request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/lab3/benchmarks")
+def benchmark_lab3_algorithms(request: Lab3BenchmarkRequest):
+    try:
+        return benchmark_lab3(request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error

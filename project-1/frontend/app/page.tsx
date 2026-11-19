@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   Activity, Ambulance, ArrowRight, BrainCircuit, GitCompareArrows,
-  MapPinned, Network, Route, ShieldCheck, Sparkles,
+  MapPinned, Network, Route, ShieldCheck, Sparkles, Swords,
 } from "lucide-react";
 import "./landing.css";
 
@@ -20,6 +20,13 @@ const projects = [
     algorithms: ["AC-3", "MRV", "Degree", "LCV", "Backtracking", "Backjumping", "Min-Conflicts"],
     features: ["Fleet and station simulation", "Step-by-step allocation playback", "Solver profiles and CSP inspection"],
   },
+  {
+    number: "03", eyebrow: "Adversarial Search", title: "Emergency Route Defense",
+    description: "Continue one frozen Lab 2 dispatch mission into a two-player road game between the emergency coordinator and a disruption agent.",
+    href: "/lab3", accent: "green", icon: Swords,
+    algorithms: ["Minimax", "Alpha-Beta", "MCTS", "UCB1"],
+    features: ["Frozen Lab 2 road state", "Traffic, flood and blocking attacks", "Tree, pruning and rollout comparison"],
+  },
 ] as const;
 
 export default function Home() {
@@ -27,14 +34,14 @@ export default function Home() {
     <main className="project-hub">
       <header className="hub-header">
         <Link href="/" className="hub-brand"><span><Network size={23} /></span><div><strong>AI LABORATORY</strong><small>Search · Constraints · Simulation</small></div></Link>
-        <div className="hub-status"><Activity size={15} /><span>Two interactive projects online</span></div>
+        <div className="hub-status"><Activity size={15} /><span>Three interactive projects online</span></div>
       </header>
 
       <section className="hub-hero">
         <div className="hero-copy">
           <span className="hero-kicker"><Sparkles size={15} /> University AI laboratory collection</span>
           <h1>Choose a project to<br /><em>start exploring.</em></h1>
-          <p>Two independent, interactive demonstrations built on the same Central Dhaka road environment. Select a project below to open its complete experiment workspace.</p>
+          <p>Three connected, interactive demonstrations built on the same Central Dhaka road environment. Select a project below to open its complete experiment workspace.</p>
           <div className="hero-facts"><span><MapPinned size={16} /> Real road topology</span><span><ShieldCheck size={16} /> Manual AI algorithms</span><span><GitCompareArrows size={16} /> Live comparisons</span></div>
         </div>
         <div className="hero-visual" aria-hidden="true">

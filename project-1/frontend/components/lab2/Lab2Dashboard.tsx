@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Ambulance, BrainCircuit, MapPinned, Play, RefreshCw, ShieldAlert } from "lucide-react";
+import { Activity, Ambulance, BrainCircuit, MapPinned, Play, RefreshCw, ShieldAlert, Swords } from "lucide-react";
 
 import { generateLab2Scenario, readableApiError, solveLab2Scenario } from "@/lib/api";
 import { LAB2_COMPARISON_SCENARIO_KEY, readLab2Workspace, saveLab2Workspace } from "@/lib/lab2-comparison";
+import { saveLab3Workspace } from "@/lib/lab3-workspace";
 import type { CSPAlgorithm, DomainInspection, Lab2GenerateRequest, Lab2Result, Lab2Scenario } from "@/types/lab2";
 import Lab2SearchVisual from "./Lab2SearchVisual";
 
@@ -125,12 +126,30 @@ export default function Lab2Dashboard() {
     }
   }
 
+  function continueToLab3() {
+    if (!scenario || !result?.allocations.length) return;
+    const allocation = currentAllocation ?? result.allocations[0];
+    const lab2Saved = saveLab2Workspace({
+      version: 1, config, algorithm, optimizeCost, scenario, result,
+      selectedVariable, playStep: Math.max(1, playStep), savedAt: Date.now(),
+    });
+    const missionSaved = saveLab3Workspace({
+      version: 1, scenario, allocation,
+      selected_at_step: Math.max(1, result.allocations.indexOf(allocation) + 1),
+    });
+    if (!missionSaved || lab2Saved === "unavailable") {
+      setError("The frozen Lab 2 mission could not be saved in this browser.");
+      return;
+    }
+    router.push("/lab3");
+  }
+
   return (
     <main className="lab2-shell">
       <header className="lab2-topbar">
         <div className="lab2-brand"><Ambulance size={23} /></div>
         <div><span className="eyebrow">AI LAB / 02 · CONSTRAINT SATISFACTION</span><h1>Dhaka Emergency Resource Allocation</h1></div>
-        <nav><Link href="/">Projects</Link><Link href="/lab1">Lab 1 · Route Search</Link><Link className="active" href="/lab2">Lab 2 · CSP</Link></nav>
+        <nav><Link href="/">Projects</Link><Link href="/lab1">Lab 1 · Route Search</Link><Link className="active" href="/lab2">Lab 2 · CSP</Link><Link href="/lab3">Lab 3 · Adversarial</Link></nav>
       </header>
 
       {error && <div className="lab2-error"><ShieldAlert size={18} /><span>{error}</span><button onClick={() => setError(null)}>Dismiss</button></div>}
@@ -153,6 +172,8 @@ export default function Lab2Dashboard() {
           <button className="lab2-primary" disabled={!scenario || loading !== null} onClick={solve}><Play size={15} /> Solve & simulate</button>
           <button className="lab2-secondary" disabled={!scenario || loading !== null} onClick={compare}><BrainCircuit size={15} /> Compare all solvers</button>
           <p className="lab2-help">Opens a separate three-map comparison page using this exact frozen scenario.</p>
+          <button className="lab2-lab3-button" disabled={!result?.allocations.length || loading !== null} onClick={continueToLab3}><Swords size={16} /> Continue selected mission to Lab 3</button>
+          <p className="lab2-help">Freezes the current allocation and exact road scenario. Lab 3 changes only the adversarial routing decisions.</p>
         </aside>
 
         <section className="lab2-main">

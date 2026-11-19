@@ -1,8 +1,8 @@
 # AI Lab — Emergency Search and Constraint Satisfaction
 
-> **Full annotated study guides:** [Lab 1 algorithms, commented code, and Banglish viva Q&A](LAB_1_README.md) · [Lab 2 CSP methods, commented code, and viva Q&A](LAB_2_README.md)
+> **Full annotated study guides:** [Lab 1 algorithms, commented code, and Banglish viva Q&A](LAB_1_README.md) · [Lab 2 CSP methods, commented code, and viva Q&A](LAB_2_README.md) · [Lab 3 adversarial search, code, experiments, and Banglish viva Q&A](LAB_3_README.md)
 
-> **Live demos:** [Project directory](https://ai-lab-project-1.vercel.app) · [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1) · [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2) · [Six-algorithm route simulation](https://ai-lab-project-1.vercel.app/simulation)
+> **Live demos:** [Project directory](https://ai-lab-project-1.vercel.app) · [Lab 1 — Emergency Route Planning](https://ai-lab-project-1.vercel.app/lab1) · [Lab 2 — Emergency Resource Allocation CSP](https://ai-lab-project-1.vercel.app/lab2) · [Lab 3 — Adversarial Route Defense](https://ai-lab-project-1.vercel.app/lab3) · [Six-algorithm route simulation](https://ai-lab-project-1.vercel.app/simulation)
 
 [**Live application**](https://ai-lab-project-1.vercel.app) · [**Six-algorithm live simulation**](https://ai-lab-project-1.vercel.app/simulation)
 
@@ -59,6 +59,8 @@ The README distinguishes textbook properties from the behavior of the exact code
 
 Lab 2 is aligned with **CSE 4101 Lecture Slide 5: Constraint Satisfaction Problems**, prepared by Mr. Palash Roy. Its complete slide-to-code mapping, implementation excerpts, viva notes, and limitations are in the [standalone Lab 2 README](LAB_2_README.md). The Lab 1 technical material in this combined README remains unchanged.
 
+Lab 3 is aligned with **CSE 4101 Lecture Slide 6: Adversarial Search**. It freezes one solved Lab 2 resource-to-incident allocation, restores the same deterministic road graph, and turns route execution into a MAX emergency-coordinator versus MIN disruption-agent game. The project manually implements Minimax, Alpha-Beta pruning, and UCB1-based Monte Carlo Tree Search. See the [standalone Lab 3 README](LAB_3_README.md) for the formal game definition, annotated code, experiments, limitations, and Banglish viva Q&A.
+
 ## Features
 
 - Real drivable-road topology from OpenStreetMap around central Dhaka.
@@ -79,6 +81,9 @@ Lab 2 is aligned with **CSE 4101 Lecture Slide 5: Constraint Satisfaction Proble
 - FastAPI validation and Swagger documentation.
 - Synthetic-graph tests independent of OpenStreetMap availability.
 - Offline fallback graph when Overpass or the GraphML cache is unavailable.
+- Connected Lab 2-to-Lab 3 mission handoff with a verified graph fingerprint.
+- Adversarial traffic, waterlogging, blocking, false-report, and no-op actions.
+- Minimax, Alpha-Beta, and MCTS comparison with three maps, pruning evidence, rollout budgets, and connected graph-scale benchmarks.
 
 ## System architecture
 

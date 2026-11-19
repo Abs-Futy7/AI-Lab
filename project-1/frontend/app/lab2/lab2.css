@@ -14,6 +14,7 @@
 .lab2-controls hr { width: 100%; margin: 15px 0 0; border: 0; border-top: 1px solid #e2e8f0; }
 .lab2-primary, .lab2-secondary, .lab2-playback button { width: 100%; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 9px; border-radius: 7px; font-size: 11px; font-weight: 850; }
 .lab2-primary { border: 1px solid #163252; color: white; background: #163252; }.lab2-primary:hover:not(:disabled) { background: #234a75; }
+.lab2-lab3-button { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 16px; border: 1px solid #15803d; border-radius: 8px; color: white; background: #15803d; font: 850 12px var(--font-raleway); }.lab2-lab3-button:disabled { opacity: .45; }
 .lab2-secondary { border: 1px solid #c9d5e1; color: #334155; background: white; }.lab2-help { margin: 10px 0 0; color: #7c8b9c; font-size: 9px; line-height: 1.5; }
 .lab2-main { padding: 14px; min-width: 0; }.lab2-summary { display: grid; grid-template-columns: repeat(6,1fr); gap: 1px; overflow: hidden; border: 1px solid #d9e3ec; border-radius: 8px; background: #d9e3ec; }
 .lab2-summary > div { min-height: 58px; display: flex; flex-direction: column; justify-content: center; padding: 9px 11px; background: #f9fbfd; }.lab2-summary span { color: #718096; font-size: 9px; font-weight: 800; text-transform: uppercase; }.lab2-summary strong { margin-top: 4px; font-size: 17px; }
