@@ -47,8 +47,19 @@ def test_minimax_and_alpha_beta_search_the_same_game_definition():
     assert payload["same_initial_state"] is True
     assert minimax["predicted_utility"] == alpha["predicted_utility"]
     assert minimax["selected_action"]["edge_id"] == alpha["selected_action"]["edge_id"]
+    assert minimax["final_route"] == alpha["final_route"]
+    assert minimax["episode"]["goal_reached"] is True
+    assert alpha["episode"]["goal_reached"] is True
     assert alpha["metrics"]["nodes_visited"] <= minimax["metrics"]["nodes_visited"]
-    assert payload["results"]["mcts"]["metrics"]["rollouts"] == 10
+    assert payload["results"]["mcts"]["metrics"]["opening_rollouts"] == 10
+    assert payload["results"]["mcts"]["metrics"]["rollouts"] >= 10
+    for result in payload["results"].values():
+        assert len(result["frames"]) > len(result["principal_variation"])
+        assert len(result["final_route"]) > 2
+        assert result["episode"]["disruptions_used"] <= result["episode"]["disruption_budget"]
+        assert [frame["player"] for frame in result["frames"][:4]] == ["MAX", "MIN", "MAX", "MIN"]
+        for disruption in result["disruptions"]:
+            assert len(disruption["segment"]) == 2
 
 
 def test_invalid_allocation_is_reported_as_validation_error():

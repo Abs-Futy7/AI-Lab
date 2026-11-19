@@ -25,6 +25,8 @@ class Lab3Config(BaseModel):
     rollout_budget: int = Field(default=100, ge=10, le=1000)
     rollout_horizon: int = Field(default=30, ge=4, le=200)
     exploration_constant: float = Field(default=1.4, gt=0, le=5)
+    disruption_budget: int = Field(default=4, ge=0, le=20)
+    max_episode_decisions: int = Field(default=240, ge=20, le=1000)
     seed: int = 42
 
 

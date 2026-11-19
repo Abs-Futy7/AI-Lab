@@ -95,7 +95,7 @@ Preparing the same snapshot twice must return the same fingerprint. The API test
 | Transition model | `apply_action()` returns a new immutable `GameState` |
 | Terminal test | Goal reached, vehicle stranded, deadline exceeded, or search depth exhausted |
 | Utility | Weighted operational quality plus large success/failure terminal reward |
-| Strategy output | First move and principal variation selected under the chosen model |
+| Strategy output | Opening principal variation plus a complete receding-horizon episode |
 
 ### Actual state versus perceived state
 
@@ -168,14 +168,18 @@ For a nonterminal state, higher is better for MAX:
 
 ```text
 U(s) = 100 x [
-    0.25 x distance_quality
+    0.25 x road_progress
   + 0.20 x (1 - average_traffic)
   + 0.15 x (1 - average_waterlogging)
   + 0.15 x (1 - average_road_damage)
   + 0.20 x (1 - average_safety_risk)
   + 0.05 x (1 - deadline_fraction)
 ]
+
+detour penalty = 15 x min(1, max(0, (travelled + remaining) / baseline - 1))
 ```
+
+`road_progress = 1 - remaining_road_distance / Lab_2_baseline_distance`. Remaining road distance comes from a manually computed reverse-Dijkstra table over the directed graph, not straight-line distance. This correction is important: the earlier `travelled + remaining` distance term measured route efficiency but did not reward moving closer to the incident, so a short depth horizon could wander among locally safe edges.
 
 Terminal rewards dominate the bounded operational score:
 
@@ -214,7 +218,13 @@ Properties in this project:
 - deterministic for one state/depth;
 - exact for the explicitly expanded depth-limited game tree;
 - records visited nodes, leaves and maximum depth;
-- returns the principal variation used by the playback.
+- returns the opening principal variation as inspectable tree evidence.
+
+### Complete receding-horizon episode
+
+The opening tree is not mislabeled as a complete route. After the first selected action, the simulator alternates MAX and MIN until a terminal state. Before every later action, the same selected algorithm searches again from the changed state using a two-ply continuation horizon; MCTS uses a bounded continuation rollout budget. This model-predictive or receding-horizon execution makes every visible road move respond to the latest disruption while keeping the serverless demonstration interactive.
+
+MIN has an explicit disruption budget, default 4. Once the budget is exhausted, `NO_DISRUPTION` is the only legal MIN response. The episode ends at goal, stranded vehicle, deadline failure, or the safety decision cap. Every frame contains the complete route so far, current vehicle position, affected edge, accumulated disruption geometry, elapsed time, utility and status.
 
 ## Alpha-Beta pruning
 
@@ -285,7 +295,7 @@ The `/api/lab3/compare` endpoint prepares the game once and passes that immutabl
 
 Only the game-search algorithm changes.
 
-The dashboard shows one map for each solver before the numerical charts. Each map uses the same Lab 2 baseline so route differences remain visible rather than being reduced to a bar only.
+The dashboard shows one synchronized animated map for each solver before the numerical charts. Each map uses the same Lab 2 baseline, advances by normalized episode progress, and draws traffic, waterlogging, road blocks and false reports on their affected road segments.
 
 ## Network-size benchmark
 
@@ -351,7 +361,7 @@ The shortened example illustrates the structure; a real request carries the comp
 2. Pause at one allocation and identify the resource, incident, distance and route.
 3. Click **Continue selected mission to Lab 3**.
 4. Point out that the scenario ID, graph fingerprint and Lab 2 baseline are frozen.
-5. Run Minimax at depth 4 and explain MAX/MIN alternation in the principal variation.
+5. Run Minimax at depth 4; play the complete episode and explain that the opening principal variation is separate from later receding-horizon replans.
 6. Run Alpha-Beta and compare its decision with Minimax.
 7. Show nodes avoided and pruning percentage.
 8. Run MCTS with 50, 100 and 200 rollouts and explain exploration versus exploitation.
@@ -391,7 +401,13 @@ A: Na. A* heuristic remaining route cost-er lower-bound estimate. Game utility o
 A: Distance 25%, traffic 20%, safety 20%, waterlogging 15%, road damage 15%, deadline 5%. Eta explicit educational operational preference. UI and API exact weights show kore, tai hidden magic number na. Different policy hole controlled experiment-e weights revise kora jabe.
 
 **Q: Terminal state ki?**  
-A: Goal reach, vehicle stranded, deadline exceed, or search-er configured depth limit-e leaf evaluation.
+A: Search tree-te goal, stranded, deadline, ba configured depth-e leaf evaluation hoy. Visible full episode goal, stranded, deadline, ba safety decision cap-e end hoy.
+
+**Q: Opening depth 4 hole map-e eto gula decision ashe keno?**
+A: Depth 4 sudhu first decision-er principal variation. Real execution-e prottek action-er por state change hoy, tai same algorithm new state theke abar short horizon search kore. Eita receding-horizon simulation; full route-ke ekta depth-4 tree bole claim kori na.
+
+**Q: Age simulation-e sudhu dot dekha jaito keno?**
+A: Age principal variation-ke incorrectly final route bola hoyechilo. Depth 4-e MAX/MIN alternate koray only dui road move chilo, MCTS-e only root move chilo. Ekhon `principal_variation` opening evidence, ar `frames/final_route` complete episode.
 
 **Q: Minimax ki dhore ney?**  
 A: Duita player-i optimal. MAX maximum child, MIN minimum child choose kore. Depth limit-er moddhe full expanded game tree evaluate kore.
@@ -471,7 +487,7 @@ npm run build
 - Traffic, waterlogging, damage, risk and false information are simulated.
 - MIN currently attacks MAX's most likely next edge rather than any graph edge; this keeps the teaching tree meaningful and bounded.
 - MAX expands at most six ordered outgoing actions per state.
-- Exact methods are depth-limited and therefore exact only for that expanded horizon.
+- Exact methods are exact for each explicitly expanded horizon; the full episode is a sequence of such receding-horizon decisions, not one exhaustive source-to-goal game tree.
 - MCTS rollout policy is intentionally simple and seeded.
 - The utility weights are explainable policy choices, not learned medical or transport policy.
 - Reaching the incident is the Lab 3 goal; later hospital transport remains visible from Lab 2 but is outside this game episode.

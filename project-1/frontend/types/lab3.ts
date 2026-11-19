@@ -7,6 +7,8 @@ export interface Lab3Config {
   rollout_budget: number;
   rollout_horizon: number;
   exploration_constant: number;
+  disruption_budget: number;
+  max_episode_decisions: number;
   seed: number;
 }
 
@@ -43,6 +45,12 @@ export interface Lab3Action {
 export interface Lab3Frame {
   step: number; player: "MAX" | "MIN"; action: Lab3Action;
   route: Lab3Point[]; elapsed_minutes: number; realized_utility: number;
+  affected_segment: Lab3Point[]; focus: Lab3Point; status: string;
+  disruptions: Lab3Disruption[];
+}
+
+export interface Lab3Disruption {
+  type: string; edge_id?: string; u?: string; v?: string; segment?: Lab3Point[];
 }
 
 export interface Lab3Result {
@@ -56,11 +64,19 @@ export interface Lab3Result {
     pruned_branches: number; runtime_ms: number; rollouts?: number;
     expanded_nodes?: number; average_rollout_depth?: number;
     nodes_avoided_vs_minimax?: number; pruning_percentage?: number;
+    opening_nodes_visited?: number; opening_runtime_ms?: number; opening_rollouts?: number;
   };
   tree: Array<Record<string, unknown>>;
   frames: Lab3Frame[];
   final_route: Lab3Point[];
   disruptions: Array<Record<string, unknown>>;
+  episode: {
+    status: string; goal_reached: boolean; stranded: boolean; deadline_exceeded: boolean;
+    step_limit_reached: boolean; decisions: number; max_moves: number; min_actions: number;
+    replans: number; disruptions_used: number; disruption_budget: number;
+    travelled_m: number; elapsed_minutes: number; search_nodes: number;
+    search_runtime_ms: number; simulation_runtime_ms: number;
+  };
   config: Lab3Config;
   root_children?: Array<{ action: Lab3Action; visits: number; average_reward: number; ucb1: number | null }>;
   convergence?: Array<{ rollouts: number; best_average_reward: number }>;

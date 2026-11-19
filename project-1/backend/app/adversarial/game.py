@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from hashlib import sha256
+from heapq import heappop, heappush
 from math import asin, cos, radians, sin, sqrt
 from typing import Any
 
@@ -51,6 +52,8 @@ class PreparedGame:
     baseline_route: list[dict[str, float]]
     graph_fingerprint: str
     mission: dict[str, Any]
+    goal_distances: dict[Any, float]
+    disruption_budget: int = 4
 
 
 def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -116,7 +119,26 @@ def prepare_game(snapshot: Lab3LaunchSnapshot) -> PreparedGame:
         baseline_route=route,
         graph_fingerprint=graph_fingerprint(graph, snapshot),
         mission=mission,
+        goal_distances=_reverse_road_distances(graph, goal),
     )
+
+
+def _reverse_road_distances(graph: nx.MultiDiGraph, goal: Any) -> dict[Any, float]:
+    """Manual reverse Dijkstra table used as a road-topology evaluation guide."""
+    distances: dict[Any, float] = {goal: 0.0}
+    frontier: list[tuple[float, str, Any]] = [(0.0, str(goal), goal)]
+    while frontier:
+        distance, _, node = heappop(frontier)
+        if distance > distances.get(node, float("inf")):
+            continue
+        for source, _, _, data in graph.in_edges(node, keys=True, data=True):
+            if is_blocked(data):
+                continue
+            candidate = distance + float(data.get("distance_m", data.get("length", 1.0)))
+            if candidate < distances.get(source, float("inf")):
+                distances[source] = candidate
+                heappush(frontier, (candidate, str(source), source))
+    return distances
 
 
 def _merged_edge(data: dict[str, Any], override: RoadOverride | None) -> dict[str, Any]:
@@ -154,10 +176,17 @@ def legal_max_actions(game: PreparedGame, state: GameState) -> list[dict[str, An
             "key": key,
             "edge_id": identity,
             "label": f"{state.current} -> {target}",
-            "remaining_m": _haversine_m(float(node["y"]), float(node["x"]), float(goal_data["y"]), float(goal_data["x"])),
+            "remaining_m": game.goal_distances.get(
+                target,
+                _haversine_m(float(node["y"]), float(node["x"]), float(goal_data["y"]), float(goal_data["x"])),
+            ),
             "observed_cost": observed["distance_m"] * (1 + observed["traffic"] + observed["waterlogging"] + observed["condition"] + observed["risk"]),
         })
-    return sorted(actions, key=lambda item: (item["remaining_m"] + item["observed_cost"], str(item["v"]), str(item["key"])))[:6]
+    ranked = sorted(actions, key=lambda item: (item["remaining_m"] + item["observed_cost"], str(item["v"]), str(item["key"])))
+    unvisited = [item for item in ranked if item["v"] not in state.path or item["v"] == state.goal]
+    # Prefer progress through new road nodes. Revisits remain available only
+    # when a one-way/dead-end topology requires backtracking.
+    return (unvisited or ranked)[:6]
 
 
 def _target_edge(game: PreparedGame, state: GameState) -> tuple[Any, Any, Any, dict[str, Any]] | None:
@@ -169,6 +198,12 @@ def _target_edge(game: PreparedGame, state: GameState) -> tuple[Any, Any, Any, d
 
 
 def legal_min_actions(game: PreparedGame, state: GameState) -> list[dict[str, Any]]:
+    used = sum(
+        1 for item in state.disruptions
+        if item.get("type") != DisruptionAction.none.value
+    )
+    if used >= game.disruption_budget:
+        return [{"type": DisruptionAction.none.value, "label": "No disruption - budget exhausted"}]
     target = _target_edge(game, state)
     if target is None:
         return [{"type": DisruptionAction.none.value, "label": "No disruption"}]
@@ -215,7 +250,7 @@ def apply_action(game: PreparedGame, state: GameState, action: dict[str, Any]) -
 
     kind = DisruptionAction(action["type"])
     if kind == DisruptionAction.none or "edge_id" not in action:
-        return replace(state, turn="MAX", disruptions=state.disruptions + ({"type": kind.value},))
+        return replace(state, turn="MAX")
     identity = action["edge_id"]
     data = game.graph[action["u"]][action["v"]][action["key"]]
     base_actual = _merged_edge(data, state.actual.get(identity))
@@ -240,7 +275,13 @@ def apply_action(game: PreparedGame, state: GameState, action: dict[str, Any]) -
             condition=max(base_actual["condition"], 0.65),
         )
         perceived[identity] = RoadOverride(traffic=0.03, risk=0.02, condition=0.04)
-    event = {"type": kind.value, "edge_id": identity, "u": str(action["u"]), "v": str(action["v"])}
+    event = {
+        "type": kind.value,
+        "edge_id": identity,
+        "u": str(action["u"]),
+        "v": str(action["v"]),
+        "segment": edge_coordinates(game, action["u"], action["v"]),
+    }
     return replace(state, turn="MAX", actual=actual, perceived=perceived, disruptions=state.disruptions + (event,))
 
 
@@ -249,15 +290,18 @@ def is_terminal(game: PreparedGame, state: GameState) -> bool:
 
 
 def evaluate(game: PreparedGame, state: GameState, perceived: bool = True) -> float:
-    if state.current == state.goal:
-        return 1000.0 - state.elapsed_minutes
     if state.stranded or state.elapsed_minutes > game.deadline_minutes:
         return -1000.0 - state.elapsed_minutes
+    if state.current == state.goal:
+        return 1000.0 - state.elapsed_minutes
     current = game.graph.nodes[state.current]
     goal = game.graph.nodes[state.goal]
-    remaining = _haversine_m(float(current["y"]), float(current["x"]), float(goal["y"]), float(goal["x"]))
-    projected = state.travelled_m + remaining
-    distance_score = max(0.0, 1 - projected / (2 * game.baseline_distance_m))
+    remaining = game.goal_distances.get(
+        state.current,
+        _haversine_m(float(current["y"]), float(current["x"]), float(goal["y"]), float(goal["x"])),
+    )
+    distance_score = max(0.0, 1 - remaining / game.baseline_distance_m)
+    detour_ratio = max(0.0, (state.travelled_m + remaining) / game.baseline_distance_m - 1)
     count = max(1, state.edge_count)
     traffic = state.traffic_sum / count
     water = state.water_sum / count
@@ -272,6 +316,7 @@ def evaluate(game: PreparedGame, state: GameState, perceived: bool = True) -> fl
         + 0.20 * (1 - risk)
         + 0.05 * (1 - deadline)
     )
+    score -= 15 * min(1.0, detour_ratio)
     if perceived and state.disruptions:
         false_reports = sum(1 for item in state.disruptions if item["type"] == DisruptionAction.false_report.value)
         score += min(12.0, false_reports * 4.0)
@@ -280,3 +325,20 @@ def evaluate(game: PreparedGame, state: GameState, perceived: bool = True) -> fl
 
 def serialize_path(game: PreparedGame, state: GameState) -> list[dict[str, float]]:
     return [{"lat": float(game.graph.nodes[node]["y"]), "lng": float(game.graph.nodes[node]["x"])} for node in state.path]
+
+
+def edge_coordinates(game: PreparedGame, u: Any, v: Any) -> list[dict[str, float]]:
+    return [
+        {"lat": float(game.graph.nodes[node]["y"]), "lng": float(game.graph.nodes[node]["x"])}
+        for node in (u, v)
+    ]
+
+
+def state_status(game: PreparedGame, state: GameState) -> str:
+    if state.stranded:
+        return "stranded"
+    if state.elapsed_minutes > game.deadline_minutes:
+        return "deadline_exceeded"
+    if state.current == state.goal:
+        return "goal_reached"
+    return "in_progress"
