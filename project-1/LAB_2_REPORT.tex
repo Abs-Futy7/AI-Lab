@@ -34,9 +34,9 @@
 \newpage
 
 \section{Executive summary}
-Lab 2 models emergency resource allocation as a finite discrete \textbf{Constraint Satisfaction Problem (CSP)}. It is deliberately different from Lab 1: Lab 1 searches for one road route; Lab 2 assigns many physical resources to many incident requirements. The route-search layer is reused only to determine whether a candidate assignment is reachable and to attach \textbf{distance, travel time, cost, and route geometry} to the candidate value.
+This report defines an emergency resource-allocation problem as a finite discrete \textbf{Constraint Satisfaction Problem (CSP)}. The problem contains a set of simultaneous \textbf{incident requirements}, a set of physical \textbf{resources}, a domain of legal resources for every requirement, and hard constraints describing type compatibility, availability, capacity, reachable roads, deadlines, budgets, facility beds, and all-different resource use. A domain value is therefore a complete candidate dispatch record containing \textbf{resource identity, route geometry, distance, travel time, receiving facility, and estimated cost}.
 
-The implementation contains \textbf{seeded scenario generation}, typed physical resources, emergency incidents, hospital and burn-unit capacity, unary domain filtering, a sparse binary constraint graph, \textbf{AC-3}, \textbf{MRV/Degree/Severity/LCV ordering}, \textbf{Forward-Checking Backtracking}, \textbf{Conflict-Directed Backjumping}, and \textbf{Min-Conflicts}. The browser receives backend traces and renders the exact decisions, not an invented animation.
+The implementation generates a \textbf{seeded scenario}, filters unary constraints, constructs a sparse binary constraint graph, enforces \textbf{AC-3}, and searches or repairs the remaining domains using \textbf{MRV/Degree/Severity/LCV ordering}, \textbf{Forward-Checking Backtracking}, \textbf{Conflict-Directed Backjumping}, and \textbf{Min-Conflicts}. The result is an allocation, a proof-oriented decision trace, and measurable evidence for feasibility, cost, response time, conflicts, and search effort.
 
 \section{Objectives}
 \begin{enumerate}

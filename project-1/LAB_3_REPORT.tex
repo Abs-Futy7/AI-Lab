@@ -34,9 +34,9 @@
 \newpage
 
 \section{Executive summary}
-Lab 3 extends the emergency mission into a two-player \textbf{adversarial search problem}. The \textbf{MAX player} is the emergency coordinator and tries to move an ambulance toward a fixed incident. The \textbf{MIN player} is a bounded disruption agent and chooses a legal nearby road disruption that reduces progress or increases risk. The same graph, start, goal, and mission constraints are passed to \textbf{Minimax}, \textbf{Alpha--Beta pruning}, and \textbf{Monte Carlo Tree Search (MCTS)}. The dashboard shows one synchronized map for each method and a final route map comparing the baseline route with the game response.
+This report defines an emergency route-defense problem as a finite, deterministic, two-player \textbf{adversarial search game}. A state contains the current road node, remaining road context, active hazards, elapsed time, disruption budget, and decision depth. The \textbf{MAX player} is the emergency coordinator, whose legal action advances the vehicle toward a fixed goal. The \textbf{MIN player} is a bounded disruption agent, whose legal action may leave a road unchanged, increase traffic or waterlogging, damage a road, block it, or issue a false report.
 
-The implementation is a real simulation: the opening search builds a \textbf{depth-limited decision trace}, then the coordinator and disruption agent alternate through a complete receding-horizon episode until the goal, a horizon, or the finite disruption budget is reached. The route lines, decisions, hazards, \textbf{node counts, pruning, utility, and runtime} are returned by the backend and rendered by the frontend.
+Each action creates a successor state and changes progress, travel time, risk, and utility. The game ends when the vehicle reaches the goal, becomes stranded, exceeds the deadline, or reaches its finite horizon. \textbf{Minimax}, \textbf{Alpha--Beta pruning}, and \textbf{Monte Carlo Tree Search (MCTS)} are evaluated with the same state representation, utility function, disruption budget, and deterministic configuration. The report records the selected route, adversarial events, decisions, utility, expanded nodes, pruning, and runtime.
 
 \section{Objectives}
 \begin{itemize}
