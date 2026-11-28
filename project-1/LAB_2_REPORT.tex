@@ -11,21 +11,22 @@
 \definecolor{blue}{HTML}{175CD3}
 \definecolor{codebg}{HTML}{F4F7FA}
 \definecolor{codegray}{HTML}{526273}
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{0pt}{2.5ex plus 1ex minus .2ex}{1.2ex plus .2ex}{\color{navy}\Large\bfseries}}
+\renewcommand\subsection{\@startsection{subsection}{2}{0pt}{2ex plus .8ex minus .2ex}{.8ex plus .2ex}{\color{blue}\large\bfseries}}
+\makeatother
 \pagestyle{fancy}\fancyhf{}\lhead{AI Laboratory - Lab 2}\rhead{Constraint Satisfaction}\cfoot{\thepage}
 \lstdefinestyle{python}{language=Python,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{navy}\bfseries,commentstyle=\color{codegray}\itshape,stringstyle=\color{blue},backgroundcolor=\color{codebg},frame=single,breaklines=true,showstringspaces=false,columns=fullflexible}
 \newcommand{\pathcode}[1]{\texttt{\small #1}}
+\newcommand{\heuristicbox}[2]{\begin{center}\fcolorbox{navy}{blue!5}{\parbox{0.88\textwidth}{\textcolor{navy}{\textbf{#1}}\\[2pt]#2}}\end{center}}
 \title{\textbf{Laboratory Report 2}\\[5pt]\Large Dhaka Emergency Resource Allocation using Constraint Satisfaction}
-\author{Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
+\author{\textbf{MD Abukor Siddique}\\Roll: 47\\[4pt]Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
 \date{November 28, 2026}
 \begin{document}
 \maketitle
 \thispagestyle{empty}
-\begin{center}
-\fcolorbox{navy!40}{blue!5}{\parbox{0.88\textwidth}{\centering
-\textbf{Core question:} which unique physical ambulance, fire unit, or rescue team should serve each simultaneous emergency requirement while satisfying all hard constraints?}}
-\end{center}
 \vfill
-\begin{center}\textit{Implementation report and viva preparation document}\end{center}
+\begin{center}\textit{Official laboratory report}\end{center}
 \newpage
 \tableofcontents
 \newpage
@@ -58,25 +59,6 @@ The goal is to find an assignment $A$ satisfying:
 A(X_i)&\neq A(X_j)\quad(i\neq j).
 \end{align*}
 If no complete assignment exists, the API reports partial or unsatisfied status and keeps the largest feasible subset for educational playback instead of claiming success.
-
-\section{Lecture Slide 5 mapping}
-\begin{longtable}{p{0.32\textwidth}p{0.57\textwidth}}
-\toprule
-\textbf{Slide idea} & \textbf{Code/design mapping}\\
-\midrule
-Variables & Requirement slots such as incident + resource type + slot number.\\
-Domains & Physical resource IDs after reachability, deadline, cost, capacity, and bed filtering.\\
-Constraints & Unary operational rules plus binary $X_i\neq X_j$.\\
-Constraint graph & Variables are vertices; overlapping domains create sparse edges.\\
-Arc consistency & Manual queue-based AC-3 and REVISE.\\
-Variable heuristic & MRV/MCV, dynamic Degree, Severity, stable ID.\\
-Value heuristic & LCV, travel time, stable resource ID.\\
-Exact search & Backtracking with Forward Checking.\\
-Conflict-directed search & CBJ conflict sets and non-chronological jumps.\\
-Local search & Seeded Min-Conflicts repairs.\\
-\bottomrule
-\end{longtable}
-AC-3 is preprocessing, not MAC. The project does not claim path consistency or general $k$-consistency.
 
 \section{Architecture and execution pipeline}
 \begin{verbatim}
@@ -134,6 +116,7 @@ return True
 AC-3 establishes local pairwise support, not a complete global assignment. A global matchability check catches Hall/pigeonhole shortages that pairwise support alone may miss.
 
 \section{Heuristics: MRV, Degree, Severity, and LCV}
+\heuristicbox{Variable and value ordering}{MRV selects the requirement with the fewest legal values. Dynamic Degree breaks ties using the number of remaining constrained neighbors, Severity protects urgent incidents, and LCV tries the value that removes the fewest neighbor values. These rules reduce wasted search while preserving deterministic, explainable behavior.}
 The exact variable key is
 \begin{equation}
 (\lvert D(X_i)\rvert,-\operatorname{degree}(X_i),-\operatorname{severity}(X_i),\operatorname{id}(X_i)).
@@ -215,7 +198,7 @@ for step in range(max_steps):
 return assignment
 \end{lstlisting}
 
-\section{Representative experiment and interpretation}
+\section{Experiment}
 The following run used deterministic seed 42, three incidents, a relaxed 60-minute deadline, high resource availability, and the normal-road scenario. All three solvers received the same generated CSP and the same filtered candidate domains.
 
 \begin{table}[h]
@@ -235,8 +218,8 @@ Min-Conflicts & 4/4 & 0 & 0 & 0.036 & 4911.50 & 8.83\\
 
 The exact methods found the same low-cost complete allocation in this easy instance. Min-Conflicts returned faster, but its repaired assignment was more expensive and slower on average. This is not a universal ranking: CBJ becomes more useful when a deep contradiction has a small, identifiable cause; Min-Conflicts becomes attractive when the instance is large and a good assignment is more important than an optimality proof.
 
-\subsection{Why the web request can feel slow}
-The table's runtime is solver runtime measured inside the backend. A browser request also includes JSON transfer, serverless cold start, graph construction, route candidates, and domain filtering. For the 30-incident default scenario, a request body was approximately 22.9 KB and the complete round trip could take about 29.7 seconds while the measured solver section was only about 5.8 ms. Therefore the visible delay is dominated by candidate/domain preparation and deployment overhead, not by the recursive algorithm itself. A fair report must label these as separate measurements.
+\subsection{Comparison and selection}
+Backtracking and conflict-directed backjumping produced the same complete, lowest-cost allocation in this run. Backjumping is preferable when contradictions arise deep in the tree because it can skip irrelevant ancestors. Min-Conflicts was fastest on this small instance, but returned a higher-cost assignment; it becomes more attractive on large, loosely constrained problems where a good repair is more useful than an optimality proof. Therefore the preferred solver depends on the objective: exact correctness and cost favour Backtracking/CBJ, while rapid approximate allocation favours Min-Conflicts.
 
 \section{System architecture and API}
 The backend is a FastAPI service and the frontend is a React/Next.js dashboard. The principal modules are:
@@ -255,22 +238,6 @@ Generate the scenario once, explain the incident and resource legend, then solve
 
 \section{Limitations and honest interpretation}
 This implementation uses unary domain feasibility plus binary resource-conflict constraints. AC-3 is intentionally documented as AC-3 preprocessing; the project does not claim full MAC, path consistency, or general $k$-consistency. Min-Conflicts is incomplete and may return a partial result. Travel times are deterministic scenario values rather than a live traffic feed. The graph and incidents are synthetic but geographically anchored so the experiment is reproducible.
-
-\section{Banglish viva questions and answers}
-\begin{description}
-\item[Q: CSP ta ki?] CSP holo variables, prottek variable-er domain, ebong constraints-er ekta formal model. Ekhane variable mane emergency requirement, domain mane kon resource/route diye serve kora jabe, constraint mane ek resource ek shomoy-e duplicate use kora jabe na.
-\item[Q: MRV keno?] MRV smallest remaining legal domain age select kore. Je requirement-er option kom, sheta age assign korle contradiction taratari dhora pore.
-\item[Q: Degree tie-break keno?] Same MRV hole beshi unassigned neighbor thaka variable age nei; eta future constraint beshi bole downstream pruning baray.
-\item[Q: Severity keno use kora holo?] Degree-o tie hole urgent incident-ke age priority dei. Eta operational policy, mathematical correctness-er replacement na.
-\item[Q: LCV ki kore?] Least Constraining Value emon candidate age try kore ja neighbors-er domain kom shonkha-e remove kore. Tai valid branch bachte pare.
-\item[Q: AC-3 ki complete solution dey?] Na. AC-3 pairwise arc support enforce kore; pore search diye global assignment ber korte hoy.
-\item[Q: Backtracking-er advantage ki?] Eta complete exact search; solution thakle khuje, na thakle prove korte pare. Kintu worst-case exponential.
-\item[Q: Backjumping kobe better?] Conflict-er root jodi deep tree-te thake, CBJ irrelevant parent skip kore directly responsible variable-e jump kore.
-\item[Q: Min-Conflicts kobe better?] Boro, noisy, loosely constrained problem-e quickly usable assignment dite pare. Kintu optimality ba unsatisfiability prove kore na.
-\item[Q: Cost kivabe?] Distance, traffic, road condition, ebong safety risk weighted sum. Capacity/deadline-er moto hard constraint age filter hoy; cost valid candidate-er moddhe compare hoy.
-\item[Q: Traffic ki live?] Na, reproducible experiment-er jonno seeded traffic factor scenario data-te generate hoy. Tai same seed-e same result repeat kora jay.
-\item[Q: Default run slow keno?] Solver runtime chhoto holeo candidate route generation, domain filtering, serverless cold start, ebong JSON transfer-er jonno total request slow hote pare.
-\end{description}
 
 \section{Conclusion}
 The Lab 2 implementation translates emergency dispatch into a reproducible CSP experiment. It combines AC-3 filtering, principled MRV/Degree/Severity/LCV ordering, two exact solvers, one local-repair solver, weighted route cost, and an auditable dashboard. The most important evaluation point is not merely which solver is fastest, but whether the comparison uses the same scenario and clearly distinguishes correctness, cost, search effort, and end-to-end latency.

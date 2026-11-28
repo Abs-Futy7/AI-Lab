@@ -11,21 +11,22 @@
 \definecolor{blue}{HTML}{175CD3}
 \definecolor{codebg}{HTML}{F4F7FA}
 \definecolor{codegray}{HTML}{526273}
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{0pt}{2.5ex plus 1ex minus .2ex}{1.2ex plus .2ex}{\color{navy}\Large\bfseries}}
+\renewcommand\subsection{\@startsection{subsection}{2}{0pt}{2ex plus .8ex minus .2ex}{.8ex plus .2ex}{\color{blue}\large\bfseries}}
+\makeatother
 \pagestyle{fancy}\fancyhf{}\lhead{AI Laboratory - Lab 3}\rhead{Adversarial Search}\cfoot{\thepage}
 \lstdefinestyle{python}{language=Python,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{navy}\bfseries,commentstyle=\color{codegray}\itshape,stringstyle=\color{blue},backgroundcolor=\color{codebg},frame=single,breaklines=true,showstringspaces=false,columns=fullflexible}
 \newcommand{\pathcode}[1]{\texttt{\small #1}}
+\newcommand{\heuristicbox}[2]{\begin{center}\fcolorbox{navy}{blue!5}{\parbox{0.88\textwidth}{\textcolor{navy}{\textbf{#1}}\\[2pt]#2}}\end{center}}
 \title{\textbf{Laboratory Report 3}\\[5pt]\Large Adversarial Search for Emergency Route Defense}
-\author{Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
+\author{\textbf{MD Abukor Siddique}\\Roll: 47\\[4pt]Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
 \date{November 28, 2026}
 \begin{document}
 \maketitle
 \thispagestyle{empty}
-\begin{center}
-\fcolorbox{navy!40}{blue!5}{\parbox{0.88\textwidth}{\centering
-\textbf{Core question:} how should an emergency coordinator choose a route when an adversary can disrupt roads after observing the coordinator's move?}}
-\end{center}
 \vfill
-\begin{center}\textit{Implementation report, experiment record, and viva preparation document}\end{center}
+\begin{center}\textit{Official laboratory report}\end{center}
 \newpage
 \tableofcontents
 \newpage
@@ -35,8 +36,7 @@ Lab 3 extends the fixed emergency mission produced by Lab 2 into a two-player ad
 
 The implementation is a real simulation: the opening search builds a depth-limited decision trace, then the coordinator and disruption agent alternate through a complete receding-horizon episode until the goal, a horizon, or the finite disruption budget is reached. The route lines, decisions, hazards, node counts, pruning, utility, and runtime are returned by the backend and rendered by the frontend.
 
-\section{Learning objectives and slide mapping}
-The implementation follows the adversarial-search ideas from the supplied AI slides:
+\section{Objectives}
 \begin{itemize}
 \item represent a road problem as a state-space game;
 \item distinguish a rational MAX agent from an opponent MIN agent;
@@ -47,17 +47,6 @@ The implementation follows the adversarial-search ideas from the supplied AI sli
 \end{itemize}
 
 Minimax and Alpha--Beta are deterministic adversarial tree search. MCTS uses repeated random rollouts and UCB1 selection, so its result may trade a small amount of utility for broader exploration. The project labels these differences rather than presenting one method as universally best.
-
-\section{Lab 2 to Lab 3 frozen handoff}
-Lab 2 first generates the Dhaka graph and allocates a resource to an incident. Lab 3 receives that solved mission through \pathcode{/api/lab3/prepare}. It stores:
-\begin{enumerate}
-\item the graph nodes and road edges;
-\item the selected resource and incident;
-\item the baseline route and its distance/time;
-\item the fixed start and goal coordinates;
-\item the deterministic seed and a graph fingerprint.
-\end{enumerate}
-No new random map is generated when the Lab 3 page is opened. This is important: all three algorithms must play on the same graph and against the same target. A fresh browser session can use a fallback frozen snapshot only when no Lab 2 session exists, but the normal path is the explicit Lab 2 handoff.
 
 \section{Formal game model}
 Let a state be
@@ -72,6 +61,7 @@ The game terminates when the goal is reached, the route has no legal continuatio
 The coordinator uses the currently observed hazards. The disruption agent can introduce a false road condition in the simulated state, but the frontend marks it as an adversarial event rather than silently changing the original Lab 2 data. This separation lets the examiner see what was fixed in the initial map and what was introduced during the game.
 
 \section{Utility and heuristic}
+\heuristicbox{Adversarial evaluation}{The evaluator rewards progress toward the goal and penalizes traffic, waterlogging, road damage, safety risk, deadline pressure, and unnecessary detours. A large terminal reward is used only for reaching or failing the mission; intermediate states use the weighted operational terms below.}
 The evaluator combines normalized terms:
 \[
 U(s)=1000T(s)+25P(s)-20C_{\text{traffic}}(s)-15C_{\text{water}}(s)-15C_{\text{damage}}(s)-20C_{\text{safety}}(s)-5C_{\text{deadline}}(s)-D(s).
@@ -141,7 +131,7 @@ while iterations < rollout_budget:
 return max(root.children, key=lambda child: child.visits)
 \end{lstlisting}
 
-\section{Representative experiment}
+\section{Experiment}
 The following run used the same frozen Lab 2 mission for all methods: depth 3, 50 MCTS rollouts, horizon 15, seed 42, and a disruption budget of 4. The selected resource was AMB009 for incident INC-001; the baseline route was 1441.91 m and 4.02 minutes.
 
 \begin{table}[h]
@@ -177,24 +167,11 @@ The main implementation is split into:
 
 The principal endpoints are \pathcode{POST /api/lab3/prepare}, \pathcode{POST /api/lab3/run}, \pathcode{POST /api/lab3/compare}, and \pathcode{GET /api/lab3/benchmarks}. Backend tests cover model validation, transitions, route progress, algorithm execution, service responses, and API behavior.
 
-\section{What is better, and when?}
+\section{Comparison and selection}
 Minimax is the simplest exact reference and is easiest to explain. Alpha--Beta is preferable when the same exact decision is needed with a larger search depth, especially with good move ordering. MCTS is preferable when the branching factor or horizon makes exhaustive search impractical, or when an anytime answer is more valuable than an exact proof. The correct conclusion is conditional: compare utility, decision quality, node work, pruning, and runtime on the same frozen mission.
 
-\section{Banglish viva questions and answers}
-\begin{description}
-\item[Q: Lab 3-e adversary ke?] MAX holo emergency coordinator, MIN holo disruption agent. MAX goal-e pouchate chay, MIN road risk ba detour barate chay.
-\item[Q: Lab 2 map keno freeze?] Same graph, start, goal, ebong seed na hole algorithm comparison fair hoy na. Tai Lab 2-er solved mission snapshot kore Lab 3-e reuse kora hoy.
-\item[Q: Minimax ki kore?] Prottek MAX level-e highest utility, MIN level-e lowest utility child ney. Eta opponent-ke rational dhore.
-\item[Q: Alpha--Beta ki result change kore?] Na, correct implementation-e Minimax-er same decision dey; shudhu impossible branch prune kore node kom evaluate kore.
-\item[Q: MCTS keno use kora holo?] Boro tree-te exhaustive search expensive. MCTS rollout kore estimated utility dey, tai anytime behavior paoa jay.
-\item[Q: Utility te distance chara onno penalty keno?] Emergency route-e traffic, waterlogging, road damage, safety, deadline sob matter kore. Sudhu shortest distance safest route guarantee kore na.
-\item[Q: Purple dashed ar blue line-er parthokko ki?] Purple dashed holo Lab 2-er frozen baseline route; blue holo adversarial game-e selected executed route.
-\item[Q: Ekta fixed principal variation diyei ki simulation?] Na. Opening search trace alada evidence; complete simulation prottek turn-e notun receding-horizon decision ney ebong disruption apply kore.
-\item[Q: Alpha--Beta kom node evaluate koreo runtime beshi keno hote pare?] Chhoto tree-te pruning-er labh-er cheye recursion, ordering, ebong bookkeeping overhead beshi hote pare. Boro/deeper tree-te advantage boro hoy.
-\item[Q: MCTS ki optimal?] Fixed rollout budget-e optimality prove kore na. Beshi rollout-e estimate improve korte pare, kintu result seed and budget dependent.
-\item[Q: Disruption ki real traffic feed?] Na. Reproducible simulation-er jonno bounded synthetic hazard action use kora hoy; map-e eta clearly hazard hisebe dekhano hoy.
-\item[Q: Lab 3-er success measure ki?] Goal reached, final utility, route risk, decisions, expanded nodes, pruned nodes, disruptions, and runtime ekshathe dekhte hoy.
-\end{description}
+\section{Limitations}
+The disruption agent is a bounded synthetic opponent rather than a live traffic feed. The search depth, rollout budget, horizon, and disruption budget constrain the game, so the reported policy is optimal only for the configured finite model. MCTS is stochastic in principle and does not prove optimality; deterministic seeds are used here for reproducible coursework experiments. Small trees can also make Alpha--Beta bookkeeping appear slower despite evaluating fewer nodes.
 
 \section{Conclusion}
 Lab 3 turns the fixed Lab 2 emergency route into a transparent adversarial-search experiment. The implementation follows the slide theory: a formal state, alternating MAX/MIN turns, terminal utility, depth-limited evaluation, Alpha--Beta pruning, and MCTS with UCB1. The synchronized maps and trace make the algorithmic behavior inspectable rather than hiding it behind one final route.
