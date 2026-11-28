@@ -69,30 +69,37 @@ The coordinator uses the currently observed hazards. The disruption agent can in
 The evaluator combines normalized terms. The implementation first computes the reverse-road progress and detour values:
 \begin{equationbox}
 \[
-\mathbf{P(s)}=\max\left(0,1-\frac{\mathrm{remaining}(s)}{\mathrm{baselineDistance}}\right),
-\qquad
-\mathbf{D(s)}=\max\left(0,\frac{\mathrm{travelled}(s)+\mathrm{remaining}(s)}
+\begin{aligned}
+\mathbf{P(s)}&=\max\left(0,1-\frac{\mathrm{remaining}(s)}
+{\mathrm{baselineDistance}}\right),\\
+\mathbf{D(s)}&=\max\left(0,\frac{\mathrm{travelled}(s)+\mathrm{remaining}(s)}
 {\mathrm{baselineDistance}}-1\right).
+\end{aligned}
 \]
 \end{equationbox}
 \begin{equationbox}
 \[
+\begin{aligned}
 \mathbf{\Delta t(e)}
-=\frac{d(e)}{25{,}000/60}
-\left(1+1.5\,\mathrm{traffic}
-0.8\,\mathrm{waterlogging}
-0.5\,\mathrm{condition}
-0.6\,\mathrm{risk}\right).
+&=\frac{d(e)}{25{,}000/60}\\
+&\quad{}\times\left(1+1.5\,\mathrm{traffic}
++0.8\,\mathrm{waterlogging}
++0.5\,\mathrm{condition}
++0.6\,\mathrm{risk}\right).
+\end{aligned}
 \]
 \end{equationbox}
 The exact normalized utility is:
 \begin{equationbox}
 \[
+\begin{aligned}
 \mathbf{U(s)}
-=100\left(0.25P(s)+0.20(1-\bar q_t)
-+0.15(1-\bar q_w)+0.15(1-\bar q_c)
-+0.20(1-\bar q_r)+0.05(1-\bar q_d)\right)
--15\min(1,D(s)).
+&=100\Big(0.25P(s)+0.20(1-\bar q_t)
++0.15(1-\bar q_w)\\
+&\quad{}+0.15(1-\bar q_c)+0.20(1-\bar q_r)
++0.05(1-\bar q_d)\Big)\\
+&\quad{}-15\min(1,D(s)).
+\end{aligned}
 \]
 \end{equationbox}
 At a goal the implementation returns $\mathbf{1000-\tau}$; for a stranded or deadline-exceeded state it returns $\mathbf{-1000-\tau}$. Here $\bar q_t,\bar q_w,\bar q_c,\bar q_r$ are the observed average traffic, waterlogging, condition, and risk, while $\bar q_d$ is normalized elapsed deadline pressure. Thus a route that is geographically closer but unsafe can score below a slightly longer safe route.
@@ -100,12 +107,13 @@ At a goal the implementation returns $\mathbf{1000-\tau}$; for a stranded or dea
 The depth-limited evaluator returns a terminal utility when possible. Otherwise it combines progress, remaining budget, travel risk, deadline slack, and a small mobility bonus for states with legal exits. All weights are explicit in \pathcode{backend/app/adversarial/game.py}; changing a weight changes policy and should be reported as an experiment configuration.
 \begin{equationbox}
 \[
+\begin{aligned}
 \mathbf{\operatorname{rank}(a)}
-=\mathrm{remainingRoadMetres}(a)
-+\mathrm{observedEdgeCost}(a),
-\qquad
+&=\mathrm{remainingRoadMetres}(a)
++\mathrm{observedEdgeCost}(a),\\
 \mathrm{remainingRoadMetres}(a)
-=d_{\mathrm{reverseDijkstra}}(\mathrm{next}(a),G).
+&=d_{\mathrm{reverseDijkstra}}(\mathrm{next}(a),G).
+\end{aligned}
 \]
 \end{equationbox}
 This is the actual action-ordering guidance used before adversarial search: lower remaining road distance plus lower observed edge cost is considered first, while Minimax, Alpha--Beta, and MCTS still determine the final game action.

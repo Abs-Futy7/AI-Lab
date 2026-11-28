@@ -261,10 +261,7 @@ The backend is a FastAPI service and the frontend is a React/Next.js dashboard. 
 
 Useful endpoints are \pathcode{POST /api/lab2/scenario/generate}, \pathcode{POST /api/lab2/solve}, \pathcode{POST /api/lab2/compare}, and \pathcode{GET /api/lab2/config}. The compare endpoint runs all three methods against one frozen scenario, which is essential for a valid comparison.
 
-\section{How to demonstrate the dashboard}
-Generate the scenario once, explain the incident and resource legend, then solve one method and open the comparison view. Point to the allocation count, unallocated requirements, conflict count, route cost, expanded/search effort, and response time. Finally show the decision trace: MRV chooses the smallest legal domain, degree resolves a tie by future constraint pressure, severity protects urgent incidents, and LCV tries the least disruptive value first.
-
-\section{Limitations and honest interpretation}
+\section{Limitations}
 This implementation uses unary domain feasibility plus binary resource-conflict constraints. AC-3 is intentionally documented as AC-3 preprocessing; the project does not claim full MAC, path consistency, or general $k$-consistency. Min-Conflicts is incomplete and may return a partial result. Travel times are deterministic scenario values rather than a live traffic feed. The graph and incidents are synthetic but geographically anchored so the experiment is reproducible.
 
 \section{Conclusion}
