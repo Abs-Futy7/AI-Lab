@@ -1,0 +1,279 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb,booktabs,longtable,array}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\definecolor{navy}{HTML}{12355B}
+\definecolor{blue}{HTML}{175CD3}
+\definecolor{codebg}{HTML}{F4F7FA}
+\definecolor{codegray}{HTML}{526273}
+\pagestyle{fancy}\fancyhf{}\lhead{AI Laboratory - Lab 2}\rhead{Constraint Satisfaction}\cfoot{\thepage}
+\lstdefinestyle{python}{language=Python,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{navy}\bfseries,commentstyle=\color{codegray}\itshape,stringstyle=\color{blue},backgroundcolor=\color{codebg},frame=single,breaklines=true,showstringspaces=false,columns=fullflexible}
+\newcommand{\pathcode}[1]{\texttt{\small #1}}
+\title{\textbf{Laboratory Report 2}\\[5pt]\Large Dhaka Emergency Resource Allocation using Constraint Satisfaction}
+\author{Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
+\date{November 28, 2026}
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+\begin{center}
+\fcolorbox{navy!40}{blue!5}{\parbox{0.88\textwidth}{\centering
+\textbf{Core question:} which unique physical ambulance, fire unit, or rescue team should serve each simultaneous emergency requirement while satisfying all hard constraints?}}
+\end{center}
+\vfill
+\begin{center}\textit{Implementation report and viva preparation document}\end{center}
+\newpage
+\tableofcontents
+\newpage
+
+\section{Executive summary}
+Lab 2 models emergency resource allocation as a finite discrete Constraint Satisfaction Problem (CSP). It is deliberately different from Lab 1: Lab 1 searches for one road route; Lab 2 assigns many physical resources to many incident requirements. The route-search layer is reused only to determine whether a candidate assignment is reachable and to attach distance, travel time, cost, and route geometry to the candidate value.
+
+The implementation contains seeded scenario generation, typed physical resources, emergency incidents, hospital and burn-unit capacity, unary domain filtering, a sparse binary constraint graph, AC-3, MRV/Degree/Severity/LCV ordering, Forward-Checking Backtracking, Conflict-Directed Backjumping, and Min-Conflicts. The browser receives backend traces and renders the exact decisions, not an invented animation.
+
+\section{Objectives}
+\begin{enumerate}
+\item Formulate emergency dispatch using $(X,D,C)$.
+\item Implement CSP algorithms manually without OR-Tools, Z3, MiniZinc, or a CSP library.
+\item Compare exact search, non-chronological backjumping, and local repair on one frozen scenario.
+\item Show route, allocation, cost, response, conflict, and effort evidence together.
+\item Explain why a solver can be fast without being cheapest, and why a complete solution is different from a partial solution.
+\end{enumerate}
+
+\section{Problem definition}
+Let $I_1,\ldots,I_m$ be simultaneous incidents and let $R_1,\ldots,R_n$ be physical resources. A severe incident can require more than one unit, so every requirement becomes a slot variable. For example, \texttt{INC-001\_AMBULANCE\_1} is the first ambulance slot of incident INC-001.
+
+The goal is to find an assignment $A$ satisfying:
+\begin{align*}
+\operatorname{type}(A(X_i)) &= \operatorname{requiredType}(X_i),\\
+\operatorname{available}(A(X_i)) &= \text{true},\\
+\operatorname{capacity}(A(X_i)) &\geq \operatorname{requiredCapacity}(X_i),\\
+\operatorname{routeExists}(A(X_i)) &= \text{true},\\
+\operatorname{travelTime}(A(X_i)) &\leq \operatorname{deadline}(X_i),\\
+\operatorname{cost}(A(X_i)) &\leq \operatorname{budget}(X_i),\\
+A(X_i)&\neq A(X_j)\quad(i\neq j).
+\end{align*}
+If no complete assignment exists, the API reports partial or unsatisfied status and keeps the largest feasible subset for educational playback instead of claiming success.
+
+\section{Lecture Slide 5 mapping}
+\begin{longtable}{p{0.32\textwidth}p{0.57\textwidth}}
+\toprule
+\textbf{Slide idea} & \textbf{Code/design mapping}\\
+\midrule
+Variables & Requirement slots such as incident + resource type + slot number.\\
+Domains & Physical resource IDs after reachability, deadline, cost, capacity, and bed filtering.\\
+Constraints & Unary operational rules plus binary $X_i\neq X_j$.\\
+Constraint graph & Variables are vertices; overlapping domains create sparse edges.\\
+Arc consistency & Manual queue-based AC-3 and REVISE.\\
+Variable heuristic & MRV/MCV, dynamic Degree, Severity, stable ID.\\
+Value heuristic & LCV, travel time, stable resource ID.\\
+Exact search & Backtracking with Forward Checking.\\
+Conflict-directed search & CBJ conflict sets and non-chronological jumps.\\
+Local search & Seeded Min-Conflicts repairs.\\
+\bottomrule
+\end{longtable}
+AC-3 is preprocessing, not MAC. The project does not claim path consistency or general $k$-consistency.
+
+\section{Architecture and execution pipeline}
+\begin{verbatim}
+1. Generate a seeded Lab 2 scenario.
+2. Build the shared directed Dhaka road graph.
+3. Reserve compatible receiving beds for ambulance slots.
+4. Compute route candidates and filter unary constraints.
+5. Build sparse binary inequality neighbors.
+6. Run AC-3 and global matchability checks.
+7. Run Backtracking, CBJ, or Min-Conflicts.
+8. Serialize allocation, route, trace, metrics, and explanations.
+9. Replay the result on the Leaflet control-center map.
+\end{verbatim}
+
+The backend is FastAPI. NetworkX stores the directed MultiDiGraph and OSMnx locates road nodes, but the CSP algorithms are project code. The principal source modules are \pathcode{app/csp/domains.py}, \pathcode{app/csp/ac3.py}, \pathcode{app/csp/backtracking.py}, \pathcode{app/csp/backjumping.py}, \pathcode{app/csp/local\_search.py}, and \pathcode{app/services/lab2\_service.py}.
+
+\section{Scenario generation}
+Scenario generation uses a seeded pseudo-random generator. The seed makes the incident coordinates, severity, resource availability, capacities, dispatch costs, facility beds, and road conditions reproducible.
+
+\subsection{Incidents and resources}
+The generator supports medical, fire, road-accident, flood/water rescue, earthquake, and pit rescue categories. Severity affects required capacity, deadlines, and whether additional resource types are required. Each physical unit has an immutable ID, type, center, coordinates, availability flag, capacity, and dispatch cost. The dashboard supports small, medium, large, and custom workloads.
+
+\subsection{Receiving facilities}
+Ambulance requirements reserve a compatible reachable facility before vehicle assignment. Emergency incidents require an emergency-capable facility; fire cases may require a burn unit. Beds are decremented when reserved so one bed cannot satisfy two simultaneous ambulance requirements.
+
+\section{Road feasibility, response time, and cost}
+The domain builder calls the shared route layer for each compatible center--incident pair. A blocked road is removed from the candidate route rather than assigned a large artificial cost. The estimated travel time uses
+\begin{equation}
+t(e)=\frac{d(e)}{25\ \mathrm{km/h}}\left(1+1.5\,\mathrm{traffic}(e)+0.8\,\mathrm{condition}(e)+0.6\,\mathrm{risk}(e)\right).
+\end{equation}
+Candidate values store route points, road distance, response time, and dispatch cost. Ambulance cost includes the receiving-facility leg.
+
+
++
+\subsection{AC-3}
+For arc $(X_i,X_j)$, a value $a\in D(X_i)$ survives if some $b\in D(X_j)$ supports $a\neq b$. A revised domain causes neighboring arcs to return to the queue.
+\begin{lstlisting}[style=python,caption={Core AC-3 logic}]
+def revise(xi, xj):
+    revised = False
+    for value in list(domains[xi]):
+        if not any(value != other for other in domains[xj]):
+            domains[xi].remove(value)
+            revised = True
+    return revised
+
+queue = [(xi, xj) for xi in variables for xj in neighbors[xi]]
+while queue:
+    xi, xj = queue.pop(0)
+    if revise(xi, xj):
+        if not domains[xi]:
+            return False
+        queue.extend((xk, xi) for xk in neighbors[xi] if xk != xj)
+return True
+\end{lstlisting}
+AC-3 establishes local pairwise support, not a complete global assignment. A global matchability check catches Hall/pigeonhole shortages that pairwise support alone may miss.
+
+\section{Heuristics: MRV, Degree, Severity, and LCV}
+The exact variable key is
+\begin{equation}
+(\lvert D(X_i)\rvert,-\operatorname{degree}(X_i),-\operatorname{severity}(X_i),\operatorname{id}(X_i)).
+\end{equation}
+MRV implements fail-first. Degree breaks an MRV tie by selecting the variable constraining more remaining variables. Severity is an emergency-specific tie-break, not a replacement for MRV. LCV ranks values by how few neighbor choices they remove; response time and resource ID break ties.
+
+\begin{lstlisting}[style=python,caption={Variable-ordering key}]
+return min(
+    remaining,
+    key=lambda name: (
+        len(problem.domains[name]),
+        -dynamic_degree(problem, name, assignment),
+        -problem.variables[name].severity,
+        name,
+    ),
+)
+\end{lstlisting}
+
+\section{Backtracking with Forward Checking}
+Backtracking assigns one variable, checks consistency, forward-checks direct neighbors, recurses, and restores every temporary removal when a branch fails. The recursion is complete for the finite filtered CSP.
+\begin{lstlisting}[style=python,caption={Simplified exact solver}]
+def backtrack(assignment):
+    if complete(assignment):
+        return assignment
+    variable = select_unassigned_variable(assignment)
+    for value in order_values_lcv(variable, assignment):
+        if consistent(variable, value, assignment):
+            assignment[variable] = value
+            removed = forward_check(variable, value, assignment)
+            if removed is not None:
+                answer = backtrack(assignment)
+                if answer is not None:
+                    return answer
+            restore(removed)
+            del assignment[variable]
+    return None
+\end{lstlisting}
+Backtracking is the clearest exact baseline. Its worst-case behavior is exponential when conflicts remain hidden until deep in the search tree.
+
++
+\section{Conflict-Directed Backjumping}
+Conflict-directed backjumping (CBJ) is an exact depth-first solver with a conflict set for each variable. When a value fails because of an already assigned neighbor, that neighbor is recorded. Instead of returning only to the immediately previous variable, CBJ jumps to the deepest variable in the accumulated conflict set and merges the remaining causes. This skips irrelevant portions of the search tree while preserving completeness.
+
+\begin{lstlisting}[style=python,caption={CBJ control flow}]
+def cbj(assignment, conflicts):
+    if complete(assignment):
+        return assignment
+    x = select_unassigned_variable(assignment)
+    conflicts[x] = set()
+    for value in order_values_lcv(x, assignment):
+        if consistent(x, value, assignment):
+            assignment[x] = value
+            removed = forward_check(x, value, assignment)
+            if removed is not None:
+                result = cbj(assignment, conflicts)
+                if result is not None:
+                    return result
+            restore(removed)
+            del assignment[x]
+        conflicts[x].update(conflicting_assigned_neighbors(x, assignment))
+    jump = deepest_assigned(conflicts[x])
+    if jump is not None:
+        conflicts[jump].update(conflicts[x] - {jump})
+    return None
+\end{lstlisting}
+
+\section{Min-Conflicts Local Search}
+Min-Conflicts is a stochastic repair method rather than an exhaustive proof-producing search. It starts from a complete or partial assignment, selects a conflicted requirement, and moves it to the legal candidate with minimum projected conflict and cost. Ties are broken deterministically using the seeded random generator and stable identifiers. It is usually fast on large, loosely constrained instances, but it can stop with a partial assignment and does not prove that no solution exists.
+
+\begin{lstlisting}[style=python,caption={Min-Conflicts repair step}]
+for step in range(max_steps):
+    conflicted = find_conflicted_variables(assignment)
+    if not conflicted:
+        return assignment
+    x = choose_conflicted(conflicted)
+    choices = legal_values(x, assignment)
+    value = min(choices, key=lambda v: projected_conflicts(x, v, assignment))
+    assignment[x] = value
+return assignment
+\end{lstlisting}
+
+\section{Representative experiment and interpretation}
+The following run used deterministic seed 42, three incidents, a relaxed 60-minute deadline, high resource availability, and the normal-road scenario. All three solvers received the same generated CSP and the same filtered candidate domains.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Measured Lab 2 comparison from the local API run}
+\begin{tabular}{lrrrrrr}
+\toprule
+Solver & Allocated & Conflicts & Search nodes & Runtime (ms) & Cost & Avg response (min)\\
+\midrule
+Backtracking & 4/4 & 0 & 5 & 0.202 & 4482.39 & 5.58\\
+Conflict-directed backjumping & 4/4 & 0 & 5 & 0.206 & 4482.39 & 5.58\\
+Min-Conflicts & 4/4 & 0 & 0 & 0.036 & 4911.50 & 8.83\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The exact methods found the same low-cost complete allocation in this easy instance. Min-Conflicts returned faster, but its repaired assignment was more expensive and slower on average. This is not a universal ranking: CBJ becomes more useful when a deep contradiction has a small, identifiable cause; Min-Conflicts becomes attractive when the instance is large and a good assignment is more important than an optimality proof.
+
+\subsection{Why the web request can feel slow}
+The table's runtime is solver runtime measured inside the backend. A browser request also includes JSON transfer, serverless cold start, graph construction, route candidates, and domain filtering. For the 30-incident default scenario, a request body was approximately 22.9 KB and the complete round trip could take about 29.7 seconds while the measured solver section was only about 5.8 ms. Therefore the visible delay is dominated by candidate/domain preparation and deployment overhead, not by the recursive algorithm itself. A fair report must label these as separate measurements.
+
+\section{System architecture and API}
+The backend is a FastAPI service and the frontend is a React/Next.js dashboard. The principal modules are:
+\begin{itemize}
+\item \pathcode{scenario\_generator.py}: seeded Dhaka incidents, facilities, resources, roads, and capacities;
+\item \pathcode{domains.py}: route-feasibility filtering and candidate construction;
+\item \pathcode{ac3.py}: arc-consistency queue and domain revision;
+\item \pathcode{backtracking.py}, \pathcode{backjumping.py}, \pathcode{local\_search.py}: the three solver implementations;
+\item \pathcode{lab2\_service.py}: orchestration, metrics, traces, and comparison response.
+\end{itemize}
+
+Useful endpoints are \pathcode{POST /api/lab2/scenario/generate}, \pathcode{POST /api/lab2/solve}, \pathcode{POST /api/lab2/compare}, and \pathcode{GET /api/lab2/config}. The compare endpoint runs all three methods against one frozen scenario, which is essential for a valid comparison.
+
+\section{How to demonstrate the dashboard}
+Generate the scenario once, explain the incident and resource legend, then solve one method and open the comparison view. Point to the allocation count, unallocated requirements, conflict count, route cost, expanded/search effort, and response time. Finally show the decision trace: MRV chooses the smallest legal domain, degree resolves a tie by future constraint pressure, severity protects urgent incidents, and LCV tries the least disruptive value first.
+
+\section{Limitations and honest interpretation}
+This implementation uses unary domain feasibility plus binary resource-conflict constraints. AC-3 is intentionally documented as AC-3 preprocessing; the project does not claim full MAC, path consistency, or general $k$-consistency. Min-Conflicts is incomplete and may return a partial result. Travel times are deterministic scenario values rather than a live traffic feed. The graph and incidents are synthetic but geographically anchored so the experiment is reproducible.
+
+\section{Banglish viva questions and answers}
+\begin{description}
+\item[Q: CSP ta ki?] CSP holo variables, prottek variable-er domain, ebong constraints-er ekta formal model. Ekhane variable mane emergency requirement, domain mane kon resource/route diye serve kora jabe, constraint mane ek resource ek shomoy-e duplicate use kora jabe na.
+\item[Q: MRV keno?] MRV smallest remaining legal domain age select kore. Je requirement-er option kom, sheta age assign korle contradiction taratari dhora pore.
+\item[Q: Degree tie-break keno?] Same MRV hole beshi unassigned neighbor thaka variable age nei; eta future constraint beshi bole downstream pruning baray.
+\item[Q: Severity keno use kora holo?] Degree-o tie hole urgent incident-ke age priority dei. Eta operational policy, mathematical correctness-er replacement na.
+\item[Q: LCV ki kore?] Least Constraining Value emon candidate age try kore ja neighbors-er domain kom shonkha-e remove kore. Tai valid branch bachte pare.
+\item[Q: AC-3 ki complete solution dey?] Na. AC-3 pairwise arc support enforce kore; pore search diye global assignment ber korte hoy.
+\item[Q: Backtracking-er advantage ki?] Eta complete exact search; solution thakle khuje, na thakle prove korte pare. Kintu worst-case exponential.
+\item[Q: Backjumping kobe better?] Conflict-er root jodi deep tree-te thake, CBJ irrelevant parent skip kore directly responsible variable-e jump kore.
+\item[Q: Min-Conflicts kobe better?] Boro, noisy, loosely constrained problem-e quickly usable assignment dite pare. Kintu optimality ba unsatisfiability prove kore na.
+\item[Q: Cost kivabe?] Distance, traffic, road condition, ebong safety risk weighted sum. Capacity/deadline-er moto hard constraint age filter hoy; cost valid candidate-er moddhe compare hoy.
+\item[Q: Traffic ki live?] Na, reproducible experiment-er jonno seeded traffic factor scenario data-te generate hoy. Tai same seed-e same result repeat kora jay.
+\item[Q: Default run slow keno?] Solver runtime chhoto holeo candidate route generation, domain filtering, serverless cold start, ebong JSON transfer-er jonno total request slow hote pare.
+\end{description}
+
+\section{Conclusion}
+The Lab 2 implementation translates emergency dispatch into a reproducible CSP experiment. It combines AC-3 filtering, principled MRV/Degree/Severity/LCV ordering, two exact solvers, one local-repair solver, weighted route cost, and an auditable dashboard. The most important evaluation point is not merely which solver is fastest, but whether the comparison uses the same scenario and clearly distinguishes correctness, cost, search effort, and end-to-end latency.
+
+\end{document}
+
