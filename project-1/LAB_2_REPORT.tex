@@ -90,14 +90,29 @@ The generator supports medical, fire, road-accident, flood/water rescue, earthqu
 Ambulance requirements reserve a compatible reachable facility before vehicle assignment. Emergency incidents require an emergency-capable facility; fire cases may require a burn unit. Beds are decremented when reserved so one bed cannot satisfy two simultaneous ambulance requirements.
 
 \section{Road feasibility, response time, and cost}
-The domain builder calls the shared route layer for each compatible center--incident pair. A blocked road is removed from the candidate route rather than assigned a large artificial cost. The estimated travel time uses
-\begin{equation}
-t(e)=\frac{d(e)}{25\ \mathrm{km/h}}\left(1+1.5\,\mathrm{traffic}(e)+0.8\,\mathrm{condition}(e)+0.6\,\mathrm{risk}(e)\right).
-\end{equation}
-Candidate values store route points, road distance, response time, and dispatch cost. Ambulance cost includes the receiving-facility leg.
-
-
-+
+The domain builder calls the shared route layer for each compatible center--incident pair. A blocked road is removed from the candidate route rather than assigned a large artificial cost. The actual Lab 2 candidate travel-time implementation uses a 25 km/h base speed:
+\begin{equationbox}
+\[
+\mathbf{T(E)}=\frac{d(E)}{25{,}000/60}\left(1+1.5\,\mathrm{traffic}(E)+0.5\,\mathrm{roadCondition}(E)\right).
+\]
+\end{equationbox}
+Candidate values store route points, road distance, response time, and dispatch cost. Ambulance cost includes the receiving-facility leg:
+\begin{equationbox}
+\[
+\mathbf{C_{\mathrm{dispatch}}(r,E)}
+=c_{\mathrm{dispatch}}(r)
++45\left(\frac{d_{\mathrm{incident}}(E)+d_{\mathrm{facility}}(E)}{1000}\right).
+\]
+\end{equationbox}
+The shared Lab 1 graph layer also exposes the exact edge-cost components used by weighted routing:
+\begin{equationbox}
+\[
+\mathbf{C(e)}=
+w_d d(e)+w_t d(e)\,\mathrm{traffic}(e)
+w_c d(e)\,\mathrm{roadCondition}(e)
+w_r d(e)\,\mathrm{risk}(e).
+\]
+\end{equationbox}
 \subsection{AC-3}
 For arc $(X_i,X_j)$, a value $a\in D(X_i)$ survives if some $b\in D(X_j)$ supports $a\neq b$. A revised domain causes neighboring arcs to return to the queue.
 \begin{lstlisting}[style=python,caption={Core AC-3 logic}]
@@ -127,6 +142,15 @@ The exact variable key is
 (\lvert D(X_i)\rvert,-\operatorname{degree}(X_i),-\operatorname{severity}(X_i),\operatorname{id}(X_i)).
 \end{equation}
 MRV implements fail-first. Degree breaks an MRV tie by selecting the variable constraining more remaining variables. Severity is an emergency-specific tie-break, not a replacement for MRV. LCV ranks values by how few neighbor choices they remove; response time and resource ID break ties.
+\begin{equationbox}
+\[
+\mathbf{h_{\mathrm{ALT}}(n)}
+=c_{\min}\max_{L}\left\{
+d(L,G)-d(L,n),\ d(n,L)-d(G,L)
+\right\}.
+\]
+\end{equationbox}
+This is the actual \textbf{ALT directed-landmark heuristic} used by the shared A* route layer while candidate roads are constructed. $d$ is directed road distance and $c_{\min}$ is the smallest legal weighted cost per metre. It is separate from the CSP ordering heuristics: \textbf{MRV/Degree/Severity/LCV select variables and values}, while ALT estimates remaining road cost.
 
 \begin{lstlisting}[style=python,caption={Variable-ordering key}]
 return min(
@@ -161,7 +185,6 @@ def backtrack(assignment):
 \end{lstlisting}
 Backtracking is the clearest exact baseline. Its worst-case behavior is exponential when conflicts remain hidden until deep in the search tree.
 
-+
 \section{Conflict-Directed Backjumping}
 Conflict-directed backjumping (CBJ) is an exact depth-first solver with a conflict set for each variable. When a value fails because of an already assigned neighbor, that neighbor is recorded. Instead of returning only to the immediately previous variable, CBJ jumps to the deepest variable in the accumulated conflict set and merges the remaining causes. This skips irrelevant portions of the search tree while preserving completeness.
 
