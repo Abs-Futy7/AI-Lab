@@ -7,6 +7,7 @@
 \usepackage{amsmath,amssymb,booktabs,longtable,array}
 \usepackage{listings}
 \usepackage{fancyhdr}
+\usepackage{tcolorbox}
 \definecolor{navy}{HTML}{12355B}
 \definecolor{blue}{HTML}{175CD3}
 \definecolor{codebg}{HTML}{F4F7FA}
@@ -18,23 +19,24 @@
 \pagestyle{fancy}\fancyhf{}\lhead{AI Laboratory - Lab 3}\rhead{Adversarial Search}\cfoot{\thepage}
 \lstdefinestyle{python}{language=Python,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{navy}\bfseries,commentstyle=\color{codegray}\itshape,stringstyle=\color{blue},backgroundcolor=\color{codebg},frame=single,breaklines=true,showstringspaces=false,columns=fullflexible}
 \newcommand{\pathcode}[1]{\texttt{\small #1}}
-\newcommand{\heuristicbox}[2]{\begin{center}\fcolorbox{navy}{blue!5}{\parbox{0.88\textwidth}{\textcolor{navy}{\textbf{#1}}\\[2pt]#2}}\end{center}}
+\newtcolorbox{equationbox}{colback=blue!5,colframe=navy,arc=5pt,boxrule=.7pt,left=8pt,right=8pt,top=6pt,bottom=6pt}
+\newcommand{\heuristicbox}[2]{\begin{tcolorbox}[colback=blue!5,colframe=navy,arc=5pt,boxrule=.7pt,left=8pt,right=8pt,top=6pt,bottom=6pt]\textcolor{navy}{\textbf{#1}}\\[2pt]#2\end{tcolorbox}}
+\newcommand{\flowbox}[1]{\begin{tcolorbox}[colback=navy!5,colframe=navy,arc=5pt,boxrule=.7pt,left=8pt,right=8pt,top=6pt,bottom=6pt]\centering\textcolor{navy}{\textbf{#1}}\end{tcolorbox}}
 \title{\textbf{Laboratory Report 3}\\[5pt]\Large Adversarial Search for Emergency Route Defense}
-\author{\textbf{MD Abukor Siddique}\\Roll: 47\\[4pt]Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
+\author{\textbf{MD Abu Bakar Siddique}\\\textbf{Roll: 47}\\[4pt]Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
 \date{November 28, 2026}
 \begin{document}
 \maketitle
 \thispagestyle{empty}
 \vfill
-\begin{center}\textit{Official laboratory report}\end{center}
 \newpage
 \tableofcontents
 \newpage
 
 \section{Executive summary}
-Lab 3 extends the fixed emergency mission produced by Lab 2 into a two-player adversarial search problem. The MAX player is the emergency coordinator and tries to move an ambulance toward a fixed incident. The MIN player is a bounded disruption agent and chooses a legal nearby road disruption that reduces progress or increases risk. The same frozen graph, start, goal, and mission constraints are passed to Minimax, Alpha--Beta pruning, and Monte Carlo Tree Search (MCTS). The dashboard shows one synchronized map for each method and a final route map comparing the common Lab 2 route with the game response.
+Lab 3 extends the emergency mission into a two-player \textbf{adversarial search problem}. The \textbf{MAX player} is the emergency coordinator and tries to move an ambulance toward a fixed incident. The \textbf{MIN player} is a bounded disruption agent and chooses a legal nearby road disruption that reduces progress or increases risk. The same graph, start, goal, and mission constraints are passed to \textbf{Minimax}, \textbf{Alpha--Beta pruning}, and \textbf{Monte Carlo Tree Search (MCTS)}. The dashboard shows one synchronized map for each method and a final route map comparing the baseline route with the game response.
 
-The implementation is a real simulation: the opening search builds a depth-limited decision trace, then the coordinator and disruption agent alternate through a complete receding-horizon episode until the goal, a horizon, or the finite disruption budget is reached. The route lines, decisions, hazards, node counts, pruning, utility, and runtime are returned by the backend and rendered by the frontend.
+The implementation is a real simulation: the opening search builds a \textbf{depth-limited decision trace}, then the coordinator and disruption agent alternate through a complete receding-horizon episode until the goal, a horizon, or the finite disruption budget is reached. The route lines, decisions, hazards, \textbf{node counts, pruning, utility, and runtime} are returned by the backend and rendered by the frontend.
 
 \section{Objectives}
 \begin{itemize}
@@ -50,9 +52,11 @@ Minimax and Alpha--Beta are deterministic adversarial tree search. MCTS uses rep
 
 \section{Formal game model}
 Let a state be
+\begin{equationbox}
 \[
 s=(v,r,h,\tau,b,d),
 \]
+\end{equationbox}
 where $v$ is the current road node, $r$ is the remaining route context, $h$ is the set of active hazards, $\tau$ is elapsed time, $b$ is the remaining disruption budget, and $d$ is the decision depth. A MAX action moves to one adjacent feasible node. A MIN action either leaves the network unchanged or activates one legal disruption near the current route. The transition function applies the move, updates travel time and risk, and decrements the disruption budget when a disruption is used.
 
 The game terminates when the goal is reached, the route has no legal continuation, the horizon is exhausted, or the simulation reaches its safety limit. A goal-reaching state receives a large positive terminal utility; a failed state receives a large negative utility. Intermediate states are evaluated with progress and operational risk.
@@ -63,15 +67,18 @@ The coordinator uses the currently observed hazards. The disruption agent can in
 \section{Utility and heuristic}
 \heuristicbox{Adversarial evaluation}{The evaluator rewards progress toward the goal and penalizes traffic, waterlogging, road damage, safety risk, deadline pressure, and unnecessary detours. A large terminal reward is used only for reaching or failing the mission; intermediate states use the weighted operational terms below.}
 The evaluator combines normalized terms:
+\begin{equationbox}
 \[
 U(s)=1000T(s)+25P(s)-20C_{\text{traffic}}(s)-15C_{\text{water}}(s)-15C_{\text{damage}}(s)-20C_{\text{safety}}(s)-5C_{\text{deadline}}(s)-D(s).
 \]
+\end{equationbox}
 Here $T(s)$ is $+1$ at a goal and $-1$ at a failed terminal state, $P(s)$ is road-network progress computed from reverse Dijkstra distances to the goal, and the $C$ terms are non-negative normalized penalties. $D(s)$ penalizes unnecessary detours. Thus a route that is geographically closer but unsafe can score below a slightly longer safe route. Unlike the Lab 1 A* heuristic, this is a game utility, not a claim that a single cost multiplier is admissible.
 
 The depth-limited evaluator returns a terminal utility when possible. Otherwise it combines progress, remaining budget, travel risk, deadline slack, and a small mobility bonus for states with legal exits. All weights are explicit in \pathcode{backend/app/adversarial/game.py}; changing a weight changes policy and should be reported as an experiment configuration.
 
 \section{Depth-limited search and complete simulation}
 At each coordinator turn, the selected algorithm searches a bounded lookahead tree. The best opening action and its decision trace are recorded. The full episode then repeats this process from the new state, allowing a disruption to appear after the previous action. This is receding-horizon control, not a single static path prediction. The simulation stops at the goal or at configured limits, so the visual route is the executed sequence, while the opening principal variation explains the first search.
+\flowbox{Frozen start and goal $\rightarrow$ MAX chooses a road move $\rightarrow$ MIN applies a bounded disruption $\rightarrow$ utility and hazards are updated $\rightarrow$ repeat until goal, horizon, or safety limit}
 
 \section{Minimax}
 Minimax assumes that MAX chooses the child with the largest utility and MIN chooses the child with the smallest utility. It is correct for the finite deterministic game model when the depth and evaluation function are fixed, but its node count grows exponentially with depth.
@@ -116,9 +123,11 @@ def alphabeta(state, depth, alpha, beta, maximizing):
 
 \section{Monte Carlo Tree Search}
 MCTS is useful when the tree is too large for exhaustive search. Each iteration selects a child using UCB1, expands an unexplored child, simulates a rollout, and backs up the result:
+\begin{equationbox}
 \[
 \operatorname{UCB1}(i)=\bar X_i+c\sqrt{\frac{\ln N}{n_i}}.
 \]
+\end{equationbox}
 The first term exploits actions with high average utility; the second explores actions visited less often. The project uses a deterministic seed for repeatability, a configured rollout budget, and a finite horizon.
 
 \begin{lstlisting}[style=python,caption={MCTS selection and backup}]
@@ -142,9 +151,9 @@ The following run used the same frozen Lab 2 mission for all methods: depth 3, 5
 \toprule
 Algorithm & Result & Decisions & Nodes & Pruned & Utility & Runtime (ms)\\
 \midrule
-Minimax & Goal reached & 67 & 269 & 0 & 992.052 & 6.556\\
-Alpha--Beta & Goal reached & 67 & 225 & 36 & 992.052 & 9.214\\
-MCTS & Goal reached & 75 & 880 & 0 & 991.057 & 184.312\\
+\textbf{Minimax} & \textbf{Goal reached} & \textbf{67} & \textbf{269} & \textbf{0} & \textbf{992.052} & \textbf{6.556}\\
+\textbf{Alpha--Beta} & \textbf{Goal reached} & \textbf{67} & \textbf{225} & \textbf{36} & \textbf{992.052} & \textbf{9.214}\\
+\textbf{MCTS} & \textbf{Goal reached} & \textbf{75} & \textbf{880} & \textbf{0} & \textbf{991.057} & \textbf{184.312}\\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -7,6 +7,7 @@
 \usepackage{amsmath,amssymb,booktabs,longtable,array}
 \usepackage{listings}
 \usepackage{fancyhdr}
+\usepackage{tcolorbox}
 \definecolor{navy}{HTML}{12355B}
 \definecolor{blue}{HTML}{175CD3}
 \definecolor{codebg}{HTML}{F4F7FA}
@@ -18,23 +19,24 @@
 \pagestyle{fancy}\fancyhf{}\lhead{AI Laboratory - Lab 2}\rhead{Constraint Satisfaction}\cfoot{\thepage}
 \lstdefinestyle{python}{language=Python,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{navy}\bfseries,commentstyle=\color{codegray}\itshape,stringstyle=\color{blue},backgroundcolor=\color{codebg},frame=single,breaklines=true,showstringspaces=false,columns=fullflexible}
 \newcommand{\pathcode}[1]{\texttt{\small #1}}
-\newcommand{\heuristicbox}[2]{\begin{center}\fcolorbox{navy}{blue!5}{\parbox{0.88\textwidth}{\textcolor{navy}{\textbf{#1}}\\[2pt]#2}}\end{center}}
+\newtcolorbox{equationbox}{colback=blue!5,colframe=navy,arc=5pt,boxrule=.7pt,left=8pt,right=8pt,top=6pt,bottom=6pt}
+\newcommand{\heuristicbox}[2]{\begin{tcolorbox}[colback=blue!5,colframe=navy,arc=5pt,boxrule=.7pt,left=8pt,right=8pt,top=6pt,bottom=6pt]\textcolor{navy}{\textbf{#1}}\\[2pt]#2\end{tcolorbox}}
+\newcommand{\flowbox}[1]{\begin{tcolorbox}[colback=navy!5,colframe=navy,arc=5pt,boxrule=.7pt,left=8pt,right=8pt,top=6pt,bottom=6pt]\centering\textcolor{navy}{\textbf{#1}}\end{tcolorbox}}
 \title{\textbf{Laboratory Report 2}\\[5pt]\Large Dhaka Emergency Resource Allocation using Constraint Satisfaction}
-\author{\textbf{MD Abukor Siddique}\\Roll: 47\\[4pt]Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
+\author{\textbf{MD Abu Bakar Siddique}\\\textbf{Roll: 47}\\[4pt]Artificial Intelligence Laboratory\\CSE 4101 -- University of Dhaka}
 \date{November 28, 2026}
 \begin{document}
 \maketitle
 \thispagestyle{empty}
 \vfill
-\begin{center}\textit{Official laboratory report}\end{center}
 \newpage
 \tableofcontents
 \newpage
 
 \section{Executive summary}
-Lab 2 models emergency resource allocation as a finite discrete Constraint Satisfaction Problem (CSP). It is deliberately different from Lab 1: Lab 1 searches for one road route; Lab 2 assigns many physical resources to many incident requirements. The route-search layer is reused only to determine whether a candidate assignment is reachable and to attach distance, travel time, cost, and route geometry to the candidate value.
+Lab 2 models emergency resource allocation as a finite discrete \textbf{Constraint Satisfaction Problem (CSP)}. It is deliberately different from Lab 1: Lab 1 searches for one road route; Lab 2 assigns many physical resources to many incident requirements. The route-search layer is reused only to determine whether a candidate assignment is reachable and to attach \textbf{distance, travel time, cost, and route geometry} to the candidate value.
 
-The implementation contains seeded scenario generation, typed physical resources, emergency incidents, hospital and burn-unit capacity, unary domain filtering, a sparse binary constraint graph, AC-3, MRV/Degree/Severity/LCV ordering, Forward-Checking Backtracking, Conflict-Directed Backjumping, and Min-Conflicts. The browser receives backend traces and renders the exact decisions, not an invented animation.
+The implementation contains \textbf{seeded scenario generation}, typed physical resources, emergency incidents, hospital and burn-unit capacity, unary domain filtering, a sparse binary constraint graph, \textbf{AC-3}, \textbf{MRV/Degree/Severity/LCV ordering}, \textbf{Forward-Checking Backtracking}, \textbf{Conflict-Directed Backjumping}, and \textbf{Min-Conflicts}. The browser receives backend traces and renders the exact decisions, not an invented animation.
 
 \section{Objectives}
 \begin{enumerate}
@@ -49,6 +51,7 @@ The implementation contains seeded scenario generation, typed physical resources
 Let $I_1,\ldots,I_m$ be simultaneous incidents and let $R_1,\ldots,R_n$ be physical resources. A severe incident can require more than one unit, so every requirement becomes a slot variable. For example, \texttt{INC-001\_AMBULANCE\_1} is the first ambulance slot of incident INC-001.
 
 The goal is to find an assignment $A$ satisfying:
+\begin{equationbox}
 \begin{align*}
 \operatorname{type}(A(X_i)) &= \operatorname{requiredType}(X_i),\\
 \operatorname{available}(A(X_i)) &= \text{true},\\
@@ -58,6 +61,7 @@ The goal is to find an assignment $A$ satisfying:
 \operatorname{cost}(A(X_i)) &\leq \operatorname{budget}(X_i),\\
 A(X_i)&\neq A(X_j)\quad(i\neq j).
 \end{align*}
+\end{equationbox}
 If no complete assignment exists, the API reports partial or unsatisfied status and keeps the largest feasible subset for educational playback instead of claiming success.
 
 \section{Architecture and execution pipeline}
@@ -74,6 +78,7 @@ If no complete assignment exists, the API reports partial or unsatisfied status 
 \end{verbatim}
 
 The backend is FastAPI. NetworkX stores the directed MultiDiGraph and OSMnx locates road nodes, but the CSP algorithms are project code. The principal source modules are \pathcode{app/csp/domains.py}, \pathcode{app/csp/ac3.py}, \pathcode{app/csp/backtracking.py}, \pathcode{app/csp/backjumping.py}, \pathcode{app/csp/local\_search.py}, and \pathcode{app/services/lab2\_service.py}.
+\flowbox{Seeded scenario $\rightarrow$ route candidates and unary filtering $\rightarrow$ AC-3 domain pruning $\rightarrow$ MRV/Degree/Severity/LCV ordering $\rightarrow$ Backtracking, CBJ, or Min-Conflicts $\rightarrow$ allocation, metrics, and map trace}
 
 \section{Scenario generation}
 Scenario generation uses a seeded pseudo-random generator. The seed makes the incident coordinates, severity, resource availability, capacities, dispatch costs, facility beds, and road conditions reproducible.
@@ -209,9 +214,9 @@ The following run used deterministic seed 42, three incidents, a relaxed 60-minu
 \toprule
 Solver & Allocated & Conflicts & Search nodes & Runtime (ms) & Cost & Avg response (min)\\
 \midrule
-Backtracking & 4/4 & 0 & 5 & 0.202 & 4482.39 & 5.58\\
-Conflict-directed backjumping & 4/4 & 0 & 5 & 0.206 & 4482.39 & 5.58\\
-Min-Conflicts & 4/4 & 0 & 0 & 0.036 & 4911.50 & 8.83\\
+\textbf{Backtracking} & \textbf{4/4} & \textbf{0} & \textbf{5} & \textbf{0.202} & \textbf{4482.39} & \textbf{5.58}\\
+\textbf{Conflict-directed backjumping} & \textbf{4/4} & \textbf{0} & \textbf{5} & \textbf{0.206} & \textbf{4482.39} & \textbf{5.58}\\
+\textbf{Min-Conflicts} & \textbf{4/4} & \textbf{0} & \textbf{0} & \textbf{0.036} & \textbf{4911.50} & \textbf{8.83}\\
 \bottomrule
 \end{tabular}
 \end{table}
